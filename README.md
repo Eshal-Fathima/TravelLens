@@ -1,6 +1,6 @@
 # TravelLens 🌍✈️
 
-An AI-powered travel trip logging and analytics platform that helps you track, analyze, and get insights from your travel experiences. Think of it as "Spotify Wrapped" but for your travel adventures!
+An AI-powered travel trip logging and analytics platform that helps you track, analyze, and get insights from your travel experiences. 
 
 ## 🌟 Features
 
