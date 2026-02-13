@@ -47,10 +47,22 @@ const TripLogger = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
+      // Convert budget to number and validate data
+      const submissionData = {
+        ...formData,
+        budget: parseFloat(formData.budget)
+      }
+      
+      // Validate budget is a valid number
+      if (isNaN(submissionData.budget) || submissionData.budget <= 0) {
+        alert('Please enter a valid budget amount')
+        return
+      }
+      
       if (editingTrip) {
-        await api.put(`/api/trips/${editingTrip.id}`, formData)
+        await api.put(`/api/trips/${editingTrip.id}`, submissionData)
       } else {
-        await api.post('/api/trips', formData)
+        await api.post('/api/trips', submissionData)
       }
       
       fetchTrips()
@@ -68,7 +80,7 @@ const TripLogger = () => {
       destination: trip.destination,
       start_date: trip.start_date?.split('T')[0] || '',
       end_date: trip.end_date?.split('T')[0] || '',
-      budget: trip.budget || '',
+      budget: trip.budget?.toString() || '',
       travel_type: trip.travel_type
     })
     setShowForm(true)

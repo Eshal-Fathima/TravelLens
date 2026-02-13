@@ -12,21 +12,32 @@ trips_bp = Blueprint('trips', __name__)
 def create_trip():
     """Create a new trip"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validate required fields
         required_fields = ['trip_name', 'destination', 'start_date', 'end_date', 'budget', 'travel_type']
         if not data or not all(k in data for k in required_fields):
-            return jsonify({'error': 'Missing required fields'}), 400
+            return jsonify({'error': 'Missing required fields', 'required': required_fields}), 400
         
         # Validate travel type
         if data['travel_type'] not in ['Solo', 'Family', 'Friends']:
-            return jsonify({'error': 'Invalid travel type'}), 400
+            return jsonify({'error': 'Invalid travel type. Must be Solo, Family, or Friends'}), 400
+        
+        # Validate and convert budget
+        try:
+            budget = float(data['budget'])
+            if budget <= 0:
+                return jsonify({'error': 'Budget must be a positive number'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Budget must be a valid number'}), 400
         
         # Parse dates
-        start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
-        end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+        try:
+            start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+            end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
         
         if start_date > end_date:
             return jsonify({'error': 'Start date cannot be after end date'}), 400
@@ -38,7 +49,7 @@ def create_trip():
             destination=data['destination'],
             start_date=start_date,
             end_date=end_date,
-            budget=data['budget'],
+            budget=budget,
             travel_type=data['travel_type']
         )
         
@@ -50,8 +61,6 @@ def create_trip():
             'trip': trip.to_dict()
         }), 201
         
-    except ValueError as e:
-        return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -61,7 +70,7 @@ def create_trip():
 def get_trips():
     """Get all trips for current user"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         trips = Trip.query.filter_by(user_id=current_user_id).order_by(Trip.created_at.desc()).all()
         
         return jsonify({
@@ -76,7 +85,7 @@ def get_trips():
 def get_trip(trip_id):
     """Get a specific trip"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         trip = Trip.query.filter_by(id=trip_id, user_id=current_user_id).first()
         
         if not trip:
@@ -94,7 +103,7 @@ def get_trip(trip_id):
 def update_trip(trip_id):
     """Update a trip"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         trip = Trip.query.filter_by(id=trip_id, user_id=current_user_id).first()
         
         if not trip:
@@ -108,14 +117,26 @@ def update_trip(trip_id):
         if 'destination' in data:
             trip.destination = data['destination']
         if 'start_date' in data:
-            trip.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+            try:
+                trip.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'error': 'Invalid start date format. Use YYYY-MM-DD'}), 400
         if 'end_date' in data:
-            trip.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+            try:
+                trip.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'error': 'Invalid end date format. Use YYYY-MM-DD'}), 400
         if 'budget' in data:
-            trip.budget = data['budget']
+            try:
+                budget = float(data['budget'])
+                if budget <= 0:
+                    return jsonify({'error': 'Budget must be a positive number'}), 400
+                trip.budget = budget
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Budget must be a valid number'}), 400
         if 'travel_type' in data:
             if data['travel_type'] not in ['Solo', 'Family', 'Friends']:
-                return jsonify({'error': 'Invalid travel type'}), 400
+                return jsonify({'error': 'Invalid travel type. Must be Solo, Family, or Friends'}), 400
             trip.travel_type = data['travel_type']
         
         # Validate dates
@@ -129,8 +150,6 @@ def update_trip(trip_id):
             'trip': trip.to_dict()
         }), 200
         
-    except ValueError as e:
-        return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -140,7 +159,7 @@ def update_trip(trip_id):
 def delete_trip(trip_id):
     """Delete a trip"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         trip = Trip.query.filter_by(id=trip_id, user_id=current_user_id).first()
         
         if not trip:

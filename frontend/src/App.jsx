@@ -17,7 +17,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {user && <Navbar user={user} setUser={logout} />}
+      {user && <Navbar user={user} />}
       <Routes>
         <Route 
           path="/login" 
