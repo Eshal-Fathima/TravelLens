@@ -10,13 +10,11 @@ const CAT_COLORS = {
   Transport: '#3b82f6', Food: '#ef4444', Stay: '#10b981',
   Activities: '#f59e0b', Shopping: '#8b5cf6', Other: '#6b7280'
 }
-
 const PLACE_COLORS = {
   Beach: '#3b82f6', Mountain: '#10b981', City: '#8b5cf6',
   Historical: '#f59e0b', Fort: '#f59e0b', Museum: '#8b5cf6',
   Temple: '#f97316', Restaurant: '#ec4899', Shopping: '#6366f1'
 }
-
 const PERSONALITY_META = {
   'Budget Explorer': { emoji: '🎒', color: '#10b981' },
   'Smart Traveler': { emoji: '🧠', color: '#3b82f6' },
@@ -25,97 +23,137 @@ const PERSONALITY_META = {
   'New Traveler': { emoji: '🌱', color: '#6b7280' },
   'Adventurer': { emoji: '🧭', color: '#f97316' },
 }
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth()
   const { t } = useTheme()
-  const [insights, setInsights] = useState(null)
+
   const [loading, setLoading] = useState(true)
+  const [insights, setInsights] = useState(null)
   const [trips, setTrips] = useState([])
   const [expenseData, setExpenseData] = useState([])
   const [tripsPerMonth, setTripsPerMonth] = useState([])
-  const [animatedStats, setAnimatedStats] = useState({ totalTrips: 0, totalSpent: 0, placesVisited: 0 })
+  const [hotelStats, setHotelStats] = useState({ total: 0, totalCost: 0 })
+  const [placeStats, setPlaceStats] = useState({ total: 0, topCategory: '—' })
+  const [recs, setRecs] = useState(null)
+  const [animatedStats, setAnimatedStats] = useState({ totalTrips: 0, totalSpent: 0, placesVisited: 0, hotels: 0 })
+  const [finalStats, setFinalStats] = useState(null) // triggers animation via useEffect
 
   useEffect(() => {
     if (user && !authLoading) fetchAll()
   }, [user, authLoading])
 
+  // Animate when finalStats is set
   useEffect(() => {
-    if (!insights) return
-    const steps = 60, ms = 2000
-    const inc = {
-      totalTrips: (insights.total_trips || 0) / steps,
-      totalSpent: (insights.total_spent || 0) / steps,
-      placesVisited: (insights.countries_visited || 0) / steps,
-    }
+    if (!finalStats) return
+    const keys = Object.keys(finalStats)
+    const steps = 50, ms = 1500
+    const inc = {}
+    keys.forEach(k => { inc[k] = finalStats[k] / steps })
     let s = 0
     const timer = setInterval(() => {
       s++
-      if (s <= steps) {
-        setAnimatedStats({
-          totalTrips: Math.floor(inc.totalTrips * s),
-          totalSpent: Math.floor(inc.totalSpent * s),
-          placesVisited: Math.floor(inc.placesVisited * s),
+      if (s < steps) {
+        setAnimatedStats(prev => {
+          const next = { ...prev }
+          keys.forEach(k => { next[k] = Math.floor(inc[k] * s) })
+          return next
         })
       } else {
         clearInterval(timer)
-        setAnimatedStats({
-          totalTrips: insights.total_trips || 0,
-          totalSpent: insights.total_spent || 0,
-          placesVisited: insights.countries_visited || 0,
-        })
+        setAnimatedStats({ ...finalStats })
       }
     }, ms / steps)
     return () => clearInterval(timer)
-  }, [insights])
+  }, [finalStats])
 
   const fetchAll = async () => {
     try {
-      const [iRes, tRes] = await Promise.all([
-        api.get(`/api/insights/${user.id}`),
-        api.get('/api/trips'),
+      // ── Step 1: fetch trips, insights, expenses, recommendations in parallel ──
+      const [iRes, tRes, eRes, recRes] = await Promise.all([
+        api.get(`/api/insights/${user.id}`).catch(() => null),
+        api.get('/api/trips').catch(() => null),
+        api.get('/api/expenses').catch(() => null),
+        api.get(`/api/recommendations/${user.id}`).catch(() => null),
       ])
-      setInsights(iRes.data.insights)
-      setTrips(tRes.data.trips.slice(0, 5))
-      await Promise.all([fetchExpenseData(), fetchTripsPerMonth()])
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
-  }
 
-  const fetchExpenseData = async () => {
-    try {
-      const res = await api.get('/api/expenses')
-      const expenses = res.data.expenses || []
+      const allTrips = tRes?.data?.trips || []
+      const insightsData = iRes?.data?.insights || null
+      setInsights(insightsData)
+      setTrips(allTrips.slice(0, 5))
+      setRecs(recRes?.data?.recommendations || null)
+
+      // ── Compute totalTrips and totalSpent from raw data, not just insights ──
+      // This ensures counts are correct even if insights API lags behind
+      const rawTripCount = allTrips.length
+      const rawTripSpend = allTrips.reduce((sum, tr) => sum + parseFloat(tr.budget || tr.total_spent || 0), 0)
+
+      // ── Trips per month ──
+      const md = {}
+      allTrips.forEach(trip => {
+        if (!trip.start_date) return
+        const m = MONTHS[new Date(trip.start_date).getMonth()]
+        md[m] = (md[m] || 0) + 1
+      })
+      setTripsPerMonth(MONTHS.map(m => ({ month: m, trips: md[m] || 0 })))
+
+      // ── Expense breakdown ──
+      const expenses = eRes?.data?.expenses || []
       const totals = {}
       expenses.forEach(e => {
         const c = e.category || 'Other'
-        totals[c] = (totals[c] || 0) + parseFloat(e.amount)
+        totals[c] = (totals[c] || 0) + parseFloat(e.amount || 0)
       })
-      const sum = Object.values(totals).reduce((a, b) => a + b, 0)
-      setExpenseData(Object.entries(totals).map(([name, amt]) => ({
-        name, value: Math.round((amt / sum) * 100), color: CAT_COLORS[name] || '#6b7280'
-      })))
-    } catch {
-      setExpenseData([
-        { name: 'Transport', value: 35, color: '#3b82f6' },
-        { name: 'Food', value: 25, color: '#ef4444' },
-        { name: 'Stay', value: 30, color: '#10b981' },
-        { name: 'Activities', value: 10, color: '#f59e0b' },
-      ])
-    }
-  }
+      const expSum = Object.values(totals).reduce((a, b) => a + b, 0)
+      setExpenseData(
+        expSum > 0
+          ? Object.entries(totals).map(([name, amt]) => ({
+            name, value: Math.round((amt / expSum) * 100), color: CAT_COLORS[name] || '#6b7280'
+          }))
+          : []
+      )
 
-  const fetchTripsPerMonth = async () => {
-    try {
-      const res = await api.get('/api/trips')
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-      const md = {}
-      res.data.trips.forEach(trip => {
-        const m = months[new Date(trip.start_date).getMonth()]
-        md[m] = (md[m] || 0) + 1
-      })
-      setTripsPerMonth(months.map(m => ({ month: m, trips: md[m] || 0 })))
-    } catch (e) { console.error(e) }
+      // ── Step 2: fetch hotels + places for each trip in parallel ──
+      if (allTrips.length > 0) {
+        const tripIds = allTrips.map(tr => tr.id)
+
+        const [hotelResults, placeResults] = await Promise.all([
+          Promise.all(tripIds.map(id => api.get(`/api/hotels/${id}`).catch(() => null))),
+          Promise.all(tripIds.map(id => api.get(`/api/places/${id}`).catch(() => null))),
+        ])
+
+        // Hotel stats
+        const allHotels = hotelResults.flatMap(r => r?.data?.hotels || [])
+        const hotelTotalCost = allHotels.reduce((sum, h) => sum + parseFloat(h.total_cost || h.price_per_night || 0), 0)
+        setHotelStats({ total: allHotels.length, totalCost: hotelTotalCost })
+
+        // Place stats
+        const allPlaces = placeResults.flatMap(r => r?.data?.places || [])
+        const catCount = {}
+        allPlaces.forEach(p => {
+          const c = p.place_type || p.category || 'Other'
+          catCount[c] = (catCount[c] || 0) + 1
+        })
+        const topCat = Object.entries(catCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '—'
+        setPlaceStats({ total: allPlaces.length, topCategory: topCat })
+
+        // Set final stats — useEffect will animate them
+        setFinalStats({
+          totalTrips: rawTripCount,
+          totalSpent: Math.max(rawTripSpend, insightsData?.total_spent || 0),
+          placesVisited: allPlaces.length,
+          hotels: allHotels.length,
+        })
+      } else {
+        setFinalStats({ totalTrips: rawTripCount, totalSpent: rawTripSpend, placesVisited: 0, hotels: 0 })
+      }
+
+    } catch (e) {
+      console.error('Dashboard fetch error:', e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (authLoading || loading) return <Spinner />
@@ -124,29 +162,26 @@ export default function Dashboard() {
   const meta = PERSONALITY_META[personality] || PERSONALITY_META['Adventurer']
 
   const tooltipStyle = {
-    background: t.card,
-    border: `1px solid ${t.border}`,
-    borderRadius: 8,
-    color: t.textPrimary,
-    fontSize: 12,
+    background: t.card, border: `1px solid ${t.border}`,
+    borderRadius: 8, color: t.textPrimary, fontSize: 12,
   }
 
   return (
     <>
       <PageHeader
         title="Travel Dashboard"
-        subtitle={`Welcome back, ${user?.name}! Here's your travel overview`}
+        subtitle={`Welcome back, ${user?.name}! Here's your complete travel overview`}
       />
 
-      {/* ── Stat Cards ── */}
+      {/* ── Row 1: Main Stat Cards — all driven from animatedStats computed from raw API data ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14, marginBottom: 24 }}>
         <StatCard label="Total Trips" value={animatedStats.totalTrips} icon="✈️" gradient="linear-gradient(135deg,#3b82f6,#6366f1)" />
-        <StatCard label="Total Spent" value={`$${animatedStats.totalSpent.toLocaleString()}`} icon="💸" gradient="linear-gradient(135deg,#10b981,#059669)" />
-        <StatCard label="Places Visited" value={animatedStats.placesVisited} icon="📍" gradient="linear-gradient(135deg,#8b5cf6,#7c3aed)" />
-        <StatCard label="Travel Style" value={`${meta.emoji} ${personality}`} icon="🧭" gradient="linear-gradient(135deg,#f97316,#ea580c)" />
+        <StatCard label="Total Budget" value={`₹${animatedStats.totalSpent.toLocaleString()}`} icon="💸" gradient="linear-gradient(135deg,#10b981,#059669)" />
+        <StatCard label="Places Logged" value={animatedStats.placesVisited} icon="📍" gradient="linear-gradient(135deg,#8b5cf6,#7c3aed)" />
+        <StatCard label="Hotels Stayed" value={animatedStats.hotels} icon="🏨" gradient="linear-gradient(135deg,#f97316,#ea580c)" />
       </div>
 
-      {/* ── Charts ── */}
+      {/* ── Row 2: Charts ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
 
         {/* Expense Pie */}
@@ -166,7 +201,7 @@ export default function Dashboard() {
                 {expenseData.map(item => (
                   <div key={item.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: 2, background: item.color, flexShrink: 0 }} />
+                      <div style={{ width: 8, height: 8, borderRadius: 2, background: item.color }} />
                       <span style={{ fontSize: 12, color: t.textSecondary }}>{item.name}</span>
                     </div>
                     <span style={{ fontSize: 12, fontWeight: 600, color: t.textPrimary }}>{item.value}%</span>
@@ -175,20 +210,22 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.textMuted, fontSize: 13 }}>
-              💸 No expense data yet
+            <div style={{ height: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: t.textMuted }}>
+              <span style={{ fontSize: 32 }}>💸</span>
+              <span style={{ fontSize: 13 }}>No expenses logged yet</span>
+              <Link to="/expense-tracker" style={{ fontSize: 12, color: t.blue, fontWeight: 600, textDecoration: 'none' }}>Add expenses →</Link>
             </div>
           )}
         </Card>
 
-        {/* Bar chart */}
+        {/* Trips bar chart */}
         <Card>
           <SectionTitle>Trips This Year</SectionTitle>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={tripsPerMonth} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={t.border} />
               <XAxis dataKey="month" stroke={t.textMuted} tick={{ fontSize: 10, fill: t.textSecondary }} />
-              <YAxis stroke={t.textMuted} tick={{ fontSize: 10, fill: t.textSecondary }} />
+              <YAxis stroke={t.textMuted} tick={{ fontSize: 10, fill: t.textSecondary }} allowDecimals={false} />
               <Tooltip contentStyle={tooltipStyle} />
               <Bar dataKey="trips" fill="#3b82f6" radius={[6, 6, 0, 0]} />
             </BarChart>
@@ -196,8 +233,8 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* ── Insights + Personality ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      {/* ── Row 3: Insights + Hotel/Place/Rec summary ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
 
         {/* Travel Insights */}
         <Card>
@@ -205,29 +242,29 @@ export default function Dashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
               { icon: '🌍', bg: '#3b82f6', label: 'Top Destination', value: insights?.most_visited_destination || 'No destinations yet' },
-              { icon: '📍', bg: '#10b981', label: 'Favorite Place', value: insights?.favorite_place_category || 'No places yet', chip: true },
+              { icon: '📍', bg: '#10b981', label: 'Fav Place Type', value: placeStats.topCategory, chip: true },
               { icon: '💳', bg: '#8b5cf6', label: 'Avg Trip Cost', value: `$${insights?.average_trip_cost || 0}` },
               { icon: '📅', bg: '#f59e0b', label: 'Travel Frequency', freq: insights?.travel_frequency || 0 },
             ].map((row, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: t.dark ? 'rgba(255,255,255,0.03)' : '#f8fafc' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: row.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: t.dark ? 'rgba(255,255,255,0.03)' : '#f8fafc' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 9, background: row.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
                   {row.icon}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: t.textPrimary, marginBottom: 2 }}>{row.label}</p>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: t.textPrimary, marginBottom: 2 }}>{row.label}</p>
                   {row.freq !== undefined ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ flex: 1, height: 5, borderRadius: 3, background: t.dark ? '#1e2f4a' : '#e2e8f0' }}>
-                        <div style={{ height: '100%', borderRadius: 3, background: '#f59e0b', width: `${Math.min(row.freq * 10, 100)}%`, transition: 'width 0.6s ease' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ flex: 1, height: 4, borderRadius: 2, background: t.dark ? '#1e2f4a' : '#e2e8f0' }}>
+                        <div style={{ height: '100%', borderRadius: 2, background: '#f59e0b', width: `${Math.min(row.freq * 10, 100)}%`, transition: 'width 0.6s ease' }} />
                       </div>
-                      <span style={{ fontSize: 11, color: t.textSecondary }}>{row.freq}/yr</span>
+                      <span style={{ fontSize: 10, color: t.textSecondary }}>{row.freq}/yr</span>
                     </div>
                   ) : row.chip ? (
-                    <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: `${PLACE_COLORS[row.value] || '#6b7280'}18`, color: PLACE_COLORS[row.value] || t.textSecondary }}>
+                    <span style={{ display: 'inline-block', padding: '1px 7px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: `${PLACE_COLORS[row.value] || '#6b7280'}18`, color: PLACE_COLORS[row.value] || t.textSecondary }}>
                       {row.value}
                     </span>
                   ) : (
-                    <p style={{ fontSize: 12, color: t.textSecondary }}>{row.value}</p>
+                    <p style={{ fontSize: 11, color: t.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.value}</p>
                   )}
                 </div>
               </div>
@@ -235,25 +272,78 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* Travel Personality — mirrors the Insights.jsx hero card style */}
-        <Card style={{ background: t.dark ? `${meta.color}10` : `${meta.color}06`, border: `1px solid ${meta.color}25`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-          <div style={{ fontSize: 52, marginBottom: 10 }}>{meta.emoji}</div>
-          <p style={{ fontSize: 11, color: t.textSecondary, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: 600 }}>Your Travel Persona</p>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 700, color: meta.color, marginBottom: 10 }}>{personality}</h2>
-          <div style={{ display: 'flex', gap: 3, marginBottom: 16 }}>
-            {[1, 2, 3, 4, 5].map(s => <span key={s} style={{ fontSize: 14, color: '#f59e0b' }}>★</span>)}
+        {/* Hotels + Places quick stats */}
+        <Card>
+          <SectionTitle>Stays & Places</SectionTitle>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Hotel block */}
+            <div style={{ borderRadius: 12, padding: '14px 16px', background: 'linear-gradient(135deg,#f97316,#ea580c)', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: -10, right: -10, width: 60, height: 60, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
+              <p style={{ fontSize: 24, marginBottom: 4 }}>🏨</p>
+              <p style={{ fontSize: 22, fontWeight: 700, color: 'white', fontFamily: "'Playfair Display', serif" }}>{hotelStats.total}</p>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>Hotels logged</p>
+              {hotelStats.totalCost > 0 && (
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>₹{hotelStats.totalCost.toLocaleString()} total</p>
+              )}
+            </div>
+            {/* Places block */}
+            <div style={{ borderRadius: 12, padding: '14px 16px', background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: -10, right: -10, width: 60, height: 60, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
+              <p style={{ fontSize: 24, marginBottom: 4 }}>📍</p>
+              <p style={{ fontSize: 22, fontWeight: 700, color: 'white', fontFamily: "'Playfair Display', serif" }}>{placeStats.total}</p>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>Places visited</p>
+              {placeStats.topCategory !== '—' && (
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>Mostly {placeStats.topCategory}</p>
+              )}
+            </div>
+            <Link to="/hotel-logger" style={{ fontSize: 12, color: t.blue, fontWeight: 600, textDecoration: 'none', textAlign: 'right' }}>Manage stays →</Link>
           </div>
-          <Link to="/insights" style={{
-            display: 'inline-block', padding: '8px 20px', borderRadius: 20,
-            background: meta.color, color: 'white', textDecoration: 'none',
-            fontSize: 13, fontWeight: 600, boxShadow: `0 4px 12px ${meta.color}44`,
-          }}>
-            View Full Insights →
-          </Link>
+        </Card>
+
+        {/* Travel Personality */}
+        <Card style={{ background: t.dark ? `${meta.color}10` : `${meta.color}06`, border: `1px solid ${meta.color}25`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>{meta.emoji}</div>
+          <p style={{ fontSize: 10, color: t.textSecondary, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: 600 }}>Your Travel Persona</p>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 700, color: meta.color, marginBottom: 10 }}>{personality}</h2>
+          <div style={{ display: 'flex', gap: 3, marginBottom: 14 }}>
+            {[1, 2, 3, 4, 5].map(s => <span key={s} style={{ fontSize: 13, color: '#f59e0b' }}>★</span>)}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+            <Link to="/insights" style={{ display: 'block', padding: '8px 0', borderRadius: 20, background: meta.color, color: 'white', textDecoration: 'none', fontSize: 12, fontWeight: 600, boxShadow: `0 4px 12px ${meta.color}44` }}>
+              View Insights →
+            </Link>
+            <Link to="/recommendations" style={{ display: 'block', padding: '8px 0', borderRadius: 20, background: t.dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: t.textSecondary, textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
+              Get Recommendations →
+            </Link>
+          </div>
         </Card>
       </div>
 
-      {/* ── Recent Adventures ── */}
+      {/* ── Row 4: Recommendation preview ── */}
+      {recs?.destinations?.length > 0 && (
+        <Card style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <SectionTitle>🌍 Recommended For You</SectionTitle>
+            <Link to="/recommendations" style={{ fontSize: 12, color: t.blue, fontWeight: 600, textDecoration: 'none' }}>See all →</Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 }}>
+            {recs.destinations.slice(0, 3).map((dest, i) => (
+              <div key={i} style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${t.border}`, background: t.card }}>
+                <div style={{ height: 3, background: ['linear-gradient(90deg,#3b82f6,#6366f1)', 'linear-gradient(90deg,#f97316,#ea580c)', 'linear-gradient(90deg,#8b5cf6,#7c3aed)'][i % 3] }} />
+                <div style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: t.textPrimary }}>{dest.name}</p>
+                    <Badge color="#3b82f6">{dest.category}</Badge>
+                  </div>
+                  <p style={{ fontSize: 12, color: t.textSecondary, lineHeight: 1.5 }}>{dest.description?.slice(0, 80)}…</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ── Row 5: Recent trips ── */}
       <Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <SectionTitle>Recent Adventures</SectionTitle>

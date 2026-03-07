@@ -53,7 +53,14 @@ export default function ExpenseTracker() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const data = { ...form, amount: parseFloat(form.amount) }
+      const amount = parseFloat(form.amount)
+      if (isNaN(amount) || amount <= 0) { alert('Please enter a valid amount.'); return }
+      const data = {
+        trip_id: parseInt(form.trip_id),
+        category: form.category,
+        amount: amount,
+        description: form.description,
+      }
       if (editing) await api.put(`/api/expenses/${editing.id}`, data)
       else await api.post('/api/expenses', data)
       fetchExpenses(); fetchSummary(); closeForm()
