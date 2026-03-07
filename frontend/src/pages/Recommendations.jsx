@@ -1,182 +1,155 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/axios'
-import { Lightbulb, MapPin, DollarSign, Compass, Target, TrendingUp, Globe, Star, Heart } from 'lucide-react'
+import { useTheme } from '../design/Themecontext'
+import { Card, Spinner, EmptyState, Badge, SectionTitle, Btn } from '../design/UI'
 
-const Recommendations = () => {
+export default function Recommendations() {
   const { user } = useAuth()
-  const [recommendations, setRecommendations] = useState(null)
+  const { t } = useTheme()
+  const [recs, setRecs] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [saved, setSaved] = useState(new Set())
 
   useEffect(() => {
-    fetchRecommendations()
+    api.get(`/api/recommendations/${user.id}`)
+      .then(r => setRecs(r.data.recommendations))
+      .catch(console.error)
+      .finally(() => setLoading(false))
   }, [])
 
-  const fetchRecommendations = async () => {
-    try {
-      const response = await api.get(`/api/recommendations/${user.id}`)
-      setRecommendations(response.data.recommendations)
-    } catch (error) {
-      console.error('Error fetching recommendations:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const toggleSave = (key) => setSaved(s => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n })
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    )
-  }
+  if (loading) return <Spinner />
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Personalized Recommendations</h1>
-        <p className="text-xl text-gray-600">Discover new destinations and optimize your travel experience</p>
+    <div>
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 700, color: t.textPrimary, marginBottom: 4 }}>Recommendations</h1>
+        <p style={{ fontSize: 14, color: t.textSecondary }}>Personalized suggestions based on your travel history</p>
       </div>
 
-      {!recommendations ? (
-        <div className="text-center py-16">
-          <Compass className="h-24 w-24 text-gray-400 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">No Recommendations Yet</h2>
-          <p className="text-gray-600 mb-8 max-w-md mx-auto">
-            Start logging your trips to get personalized travel recommendations and insights
-          </p>
-          <button className="btn-primary px-6 py-3">
-            Start Your Journey
-          </button>
-        </div>
+      {!recs ? (
+        <EmptyState icon="🧭" title="No recommendations yet" desc="Start logging your trips to get personalized destination and activity recommendations" />
       ) : (
-        <div className="space-y-12">
-          {/* Destination Recommendations */}
-          <section>
-            <div className="flex items-center mb-6">
-              <Globe className="h-6 w-6 text-primary-600 mr-2" />
-              <h2 className="text-2xl font-bold text-gray-900">Recommended Destinations</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {recommendations.destinations?.map((dest, index) => (
-                <div key={index} className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">{dest.name}</h3>
-                      <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full mt-1">
-                        {dest.category}
-                      </span>
-                    </div>
-                    <Heart className="h-5 w-5 text-gray-400 hover:text-red-500 cursor-pointer transition-colors" />
-                  </div>
-                  <p className="text-gray-600 text-sm">{dest.description}</p>
-                  <button className="mt-4 w-full btn-outline text-sm">
-                    Explore Destination
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
-          {/* Place Recommendations */}
-          <section>
-            <div className="flex items-center mb-6">
-              <MapPin className="h-6 w-6 text-primary-600 mr-2" />
-              <h2 className="text-2xl font-bold text-gray-900">Places to Visit</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {recommendations.places?.map((place, index) => (
-                <div key={index} className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                  <div className="flex items-start space-x-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
-                        <MapPin className="h-6 w-6 text-primary-600" />
+          {/* Destinations */}
+          {recs.destinations?.length > 0 && (
+            <section>
+              <SectionTitle>🌍 Recommended Destinations</SectionTitle>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
+                {recs.destinations.map((dest, i) => (
+                  <Card key={i} hover style={{ padding: 0, overflow: 'hidden' }}>
+                    <div style={{ height: 3, background: 'linear-gradient(90deg,#3b82f6,#8b5cf6)' }} />
+                    <div style={{ padding: '18px 20px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                        <div>
+                          <h3 style={{ fontSize: 16, fontWeight: 700, color: t.textPrimary, fontFamily: "'DM Sans', sans-serif", marginBottom: 5 }}>{dest.name}</h3>
+                          <Badge color="#3b82f6">{dest.category}</Badge>
+                        </div>
+                        <button onClick={() => toggleSave(`dest-${i}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, transition: 'transform 0.2s' }}>
+                          {saved.has(`dest-${i}`) ? '❤️' : '🤍'}
+                        </button>
+                      </div>
+                      <p style={{ fontSize: 13, color: t.textSecondary, lineHeight: 1.5, marginBottom: 14 }}>{dest.description}</p>
+                      <Btn variant="ghost" small style={{ width: '100%' }}>Explore →</Btn>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Places to visit */}
+          {recs.places?.length > 0 && (
+            <section>
+              <SectionTitle>📍 Places to Visit</SectionTitle>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
+                {recs.places.map((place, i) => (
+                  <Card key={i} hover>
+                    <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                      <div style={{ width: 44, height: 44, borderRadius: 11, background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>📍</div>
+                      <div>
+                        <h3 style={{ fontSize: 15, fontWeight: 700, color: t.textPrimary, fontFamily: "'DM Sans', sans-serif", marginBottom: 3 }}>{place.name}</h3>
+                        <p style={{ fontSize: 12, color: '#3b82f6', fontWeight: 600, marginBottom: 6 }}>{place.location}</p>
+                        <p style={{ fontSize: 13, color: t.textSecondary, lineHeight: 1.5 }}>{place.description}</p>
                       </div>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold text-gray-900">{place.name}</h3>
-                      <p className="text-sm text-gray-600 mb-1">{place.location}</p>
-                      <p className="text-gray-700 text-sm">{place.description}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
 
-          {/* Budget Optimization Tips */}
-          <section>
-            <div className="flex items-center mb-6">
-              <DollarSign className="h-6 w-6 text-primary-600 mr-2" />
-              <h2 className="text-2xl font-bold text-gray-900">Budget Optimization Tips</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {recommendations.budget_tips?.map((tip, index) => (
-                <div key={index} className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-xl border border-green-200">
-                  <div className="flex items-start space-x-3">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                        <TrendingUp className="h-4 w-4 text-white" />
+          {/* Budget tips */}
+          {recs.budget_tips?.length > 0 && (
+            <section>
+              <SectionTitle>💡 Budget Optimization Tips</SectionTitle>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
+                {recs.budget_tips.map((tip, i) => (
+                  <div key={i} style={{
+                    borderRadius: 14, padding: '18px 20px',
+                    background: t.dark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)',
+                    border: '1px solid rgba(16,185,129,0.2)',
+                  }}>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 9, background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>💰</div>
+                      <div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                          <Badge color="#10b981">{tip.category}</Badge>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#10b981' }}>Save {tip.savings}</span>
+                        </div>
+                        <p style={{ fontSize: 13, color: t.textSecondary, lineHeight: 1.5 }}>{tip.tip}</p>
                       </div>
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-sm font-medium text-green-800 bg-green-100 px-2 py-1 rounded">
-                          {tip.category}
-                        </span>
-                        <span className="text-sm font-bold text-green-600">
-                          Save {tip.savings}
-                        </span>
-                      </div>
-                      <p className="text-gray-700">{tip.tip}</p>
-                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </section>
+                ))}
+              </div>
+            </section>
+          )}
 
-          {/* Travel Tips */}
-          <section>
-            <div className="flex items-center mb-6">
-              <Lightbulb className="h-6 w-6 text-primary-600 mr-2" />
-              <h2 className="text-2xl font-bold text-gray-900">Travel Tips for You</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {recommendations.travel_tips?.map((tip, index) => (
-                <div key={index} className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 text-center">
-                  <div className="text-4xl mb-4">{tip.icon}</div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">{tip.title}</h3>
-                  <p className="text-gray-600 text-sm">{tip.description}</p>
-                </div>
-              ))}
-            </div>
-          </section>
+          {/* Travel tips */}
+          {recs.travel_tips?.length > 0 && (
+            <section>
+              <SectionTitle>🧠 Travel Tips for You</SectionTitle>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14 }}>
+                {recs.travel_tips.map((tip, i) => (
+                  <Card key={i} hover style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>{tip.icon}</div>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: t.textPrimary, marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>{tip.title}</h3>
+                    <p style={{ fontSize: 12, color: t.textSecondary, lineHeight: 1.6 }}>{tip.description}</p>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
 
-          {/* Next Trip Suggestions */}
-          <section>
-            <div className="flex items-center mb-6">
-              <Target className="h-6 w-6 text-primary-600 mr-2" />
-              <h2 className="text-2xl font-bold text-gray-900">Your Next Adventure</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {recommendations.next_trip_suggestions?.map((suggestion, index) => (
-                <div key={index} className="bg-gradient-to-br from-primary-500 to-primary-600 p-6 rounded-xl text-white">
-                  <h3 className="text-xl font-bold mb-2">{suggestion.type}</h3>
-                  <p className="text-primary-100 mb-4">{suggestion.suggestion}</p>
-                  <p className="text-sm text-primary-200 italic">{suggestion.reason}</p>
-                  <button className="mt-4 bg-white text-primary-600 px-4 py-2 rounded-lg font-medium hover:bg-primary-50 transition-colors">
-                    Plan This Trip
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
+          {/* Next trip suggestions */}
+          {recs.next_trip_suggestions?.length > 0 && (
+            <section>
+              <SectionTitle>🚀 Your Next Adventure</SectionTitle>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 14 }}>
+                {recs.next_trip_suggestions.map((s, i) => {
+                  const grads = ['linear-gradient(135deg,#3b82f6,#6366f1)', 'linear-gradient(135deg,#f97316,#ea580c)', 'linear-gradient(135deg,#8b5cf6,#7c3aed)']
+                  return (
+                    <div key={i} style={{ borderRadius: 14, padding: '22px', background: grads[i % grads.length], position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
+                      <h3 style={{ fontSize: 17, fontWeight: 700, color: 'white', fontFamily: "'Playfair Display', serif", marginBottom: 8 }}>{s.type}</h3>
+                      <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 6, lineHeight: 1.5 }}>{s.suggestion}</p>
+                      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', fontStyle: 'italic', marginBottom: 16 }}>{s.reason}</p>
+                      <button style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.15)', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(4px)', fontFamily: "'DM Sans', sans-serif" }}>
+                        Plan This Trip →
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+
         </div>
       )}
     </div>
   )
 }
-
-export default Recommendations

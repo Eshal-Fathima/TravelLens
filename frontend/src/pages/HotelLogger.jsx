@@ -1,338 +1,167 @@
 import { useState, useEffect } from 'react'
 import api from '../utils/axios'
-import { Plus, Edit2, Trash2, Hotel, DollarSign, Moon, Save, X, Filter } from 'lucide-react'
+import { useTheme } from './ThemeContext'
+import { PageHeader, Card, Btn, Input, Select, Modal, Badge, EmptyState, Spinner, TripSelector } from './UI'
 
-const HotelLogger = () => {
+const PlusIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+const EditIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+const TrashIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
+const MoonIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+
+const defaultForm = { trip_id: '', hotel_name: '', cost_per_night: '', nights: '' }
+
+export default function HotelLogger() {
+  const { t } = useTheme()
   const [hotels, setHotels] = useState([])
   const [trips, setTrips] = useState([])
   const [selectedTrip, setSelectedTrip] = useState('')
+  const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [editingHotel, setEditingHotel] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [formData, setFormData] = useState({
-    trip_id: '',
-    hotel_name: '',
-    cost_per_night: '',
-    nights: ''
-  })
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState(defaultForm)
 
   useEffect(() => {
-    fetchTrips()
+    api.get('/api/trips').then(r => {
+      setTrips(r.data.trips)
+      if (r.data.trips.length > 0) setSelectedTrip(r.data.trips[0].id)
+    }).catch(console.error)
   }, [])
 
-  useEffect(() => {
-    if (selectedTrip) {
-      fetchHotels(selectedTrip)
-    }
-  }, [selectedTrip])
+  useEffect(() => { if (selectedTrip) fetchHotels() }, [selectedTrip])
 
-  const fetchTrips = async () => {
-    try {
-      const response = await api.get('/api/trips')
-      setTrips(response.data.trips)
-      if (response.data.trips.length > 0 && !selectedTrip) {
-        setSelectedTrip(response.data.trips[0].id)
-      }
-    } catch (error) {
-      console.error('Error fetching trips:', error)
-    }
+  const fetchHotels = async () => {
+    setLoading(true)
+    try { const r = await api.get(`/api/hotels/${selectedTrip}`); setHotels(r.data.hotels) }
+    catch (e) { console.error(e) } finally { setLoading(false) }
   }
 
-  const fetchHotels = async (tripId) => {
-    try {
-      setLoading(true)
-      const response = await api.get(`/api/hotels/${tripId}`)
-      setHotels(response.data.hotels)
-    } catch (error) {
-      console.error('Error fetching hotels:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const resetForm = () => {
-    setFormData({
-      trip_id: selectedTrip,
-      hotel_name: '',
-      cost_per_night: '',
-      nights: ''
-    })
-    setEditingHotel(null)
-    setShowForm(false)
-  }
+  const openNew = () => { setForm({ ...defaultForm, trip_id: selectedTrip }); setEditing(null); setShowForm(true) }
+  const openEdit = (h) => { setEditing(h); setForm({ trip_id: h.trip_id, hotel_name: h.hotel_name, cost_per_night: h.cost_per_night.toString(), nights: h.nights.toString() }); setShowForm(true) }
+  const closeForm = () => { setShowForm(false); setEditing(null) }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const data = {
-        ...formData,
-        cost_per_night: parseFloat(formData.cost_per_night),
-        nights: parseInt(formData.nights)
-      }
-
-      if (editingHotel) {
-        await api.put(`/api/hotels/${editingHotel.id}`, data)
-      } else {
-        await api.post('/api/hotels', data)
-      }
-      
-      fetchHotels(selectedTrip)
-      resetForm()
-    } catch (error) {
-      console.error('Error saving hotel:', error)
-      alert('Error saving hotel. Please try again.')
-    }
+      const data = { ...form, cost_per_night: parseFloat(form.cost_per_night), nights: parseInt(form.nights) }
+      if (editing) await api.put(`/api/hotels/${editing.id}`, data)
+      else await api.post('/api/hotels', data)
+      fetchHotels(); closeForm()
+    } catch (err) { console.error(err); alert('Error saving hotel.') }
   }
 
-  const handleEdit = (hotel) => {
-    setEditingHotel(hotel)
-    setFormData({
-      trip_id: hotel.trip_id,
-      hotel_name: hotel.hotel_name,
-      cost_per_night: hotel.cost_per_night.toString(),
-      nights: hotel.nights.toString()
-    })
-    setShowForm(true)
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this hotel?')) return
+    try { await api.delete(`/api/hotels/${id}`); fetchHotels() }
+    catch (e) { console.error(e) }
   }
 
-  const handleDelete = async (hotelId) => {
-    if (window.confirm('Are you sure you want to delete this hotel?')) {
-      try {
-        await api.delete(`/api/hotels/${hotelId}`)
-        fetchHotels(selectedTrip)
-      } catch (error) {
-        console.error('Error deleting hotel:', error)
-        alert('Error deleting hotel. Please try again.')
-      }
-    }
-  }
+  const f = (key) => ({ value: form[key], onChange: e => setForm({ ...form, [key]: e.target.value }) })
+  const totalCost = (parseFloat(form.cost_per_night) || 0) * (parseInt(form.nights) || 0)
 
-  const calculateTotalCost = () => {
-    const costPerNight = parseFloat(formData.cost_per_night) || 0
-    const nights = parseInt(formData.nights) || 0
-    return costPerNight * nights
-  }
+  const totalAccommodation = hotels.reduce((sum, h) => sum + (h.total_cost || 0), 0)
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Hotel Logger</h1>
-          <p className="text-gray-600 mt-2">Track your accommodation details</p>
-        </div>
-        <button
-          onClick={() => {
-            setFormData({...formData, trip_id: selectedTrip})
-            setShowForm(true)
-          }}
-          disabled={!selectedTrip}
-          className="btn-primary flex items-center space-x-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Add Hotel</span>
-        </button>
-      </div>
+    <>
+      <PageHeader
+        title="Hotel Logger"
+        subtitle="Track your accommodation details and costs"
+        action={<Btn onClick={openNew} disabled={!selectedTrip}><PlusIcon /> Add Hotel</Btn>}
+      />
 
-      {/* Trip Selector */}
-      <div className="mb-6">
-        <label className="label mb-2 block">Select Trip</label>
-        <div className="flex items-center space-x-4">
-          <select
-            value={selectedTrip}
-            onChange={(e) => setSelectedTrip(e.target.value)}
-            className="input flex-1 max-w-xs"
-          >
-            <option value="">Choose a trip...</option>
-            {trips.map((trip) => (
-              <option key={trip.id} value={trip.id}>
-                {trip.trip_name} - {trip.destination}
-              </option>
-            ))}
-          </select>
-          <Filter className="h-5 w-5 text-gray-400" />
-        </div>
-      </div>
+      <TripSelector trips={trips} value={selectedTrip} onChange={setSelectedTrip} />
 
-      {/* Hotel Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                {editingHotel ? 'Edit Hotel' : 'Add New Hotel'}
-              </h2>
-              <button
-                onClick={resetForm}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="label">Trip</label>
-                <select
-                  required
-                  className="input"
-                  value={formData.trip_id}
-                  onChange={(e) => setFormData({...formData, trip_id: e.target.value})}
-                >
-                  <option value="">Select a trip...</option>
-                  {trips.map((trip) => (
-                    <option key={trip.id} value={trip.id}>
-                      {trip.trip_name} - {trip.destination}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="label">Hotel Name</label>
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  value={formData.hotel_name}
-                  onChange={(e) => setFormData({...formData, hotel_name: e.target.value})}
-                  placeholder="Taj Resort & Convention Centre"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Cost per Night (₹)</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    className="input"
-                    value={formData.cost_per_night}
-                    onChange={(e) => setFormData({...formData, cost_per_night: e.target.value})}
-                    placeholder="8000"
-                  />
-                </div>
-                <div>
-                  <label className="label">Nights</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    className="input"
-                    value={formData.nights}
-                    onChange={(e) => setFormData({...formData, nights: e.target.value})}
-                    placeholder="4"
-                  />
-                </div>
-              </div>
-
-              {calculateTotalCost() > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-blue-900">Total Cost</span>
-                    <span className="text-lg font-bold text-blue-900">₹{calculateTotalCost().toLocaleString()}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="submit"
-                  className="btn-primary flex-1 flex items-center justify-center space-x-2"
-                >
-                  <Save className="h-4 w-4" />
-                  <span>{editingHotel ? 'Update' : 'Add'} Hotel</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="btn-outline flex-1"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+      {selectedTrip && hotels.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14, marginBottom: 24 }}>
+          <div style={{ background: t.card, borderRadius: 14, padding: '18px 20px', border: `1px solid ${t.border}` }}>
+            <p style={{ fontSize: 12, color: t.textSecondary, marginBottom: 4 }}>Total Accommodation</p>
+            <p style={{ fontSize: 24, fontWeight: 700, color: t.textPrimary, fontFamily: "'Playfair Display', serif" }}>₹{totalAccommodation.toLocaleString()}</p>
+          </div>
+          <div style={{ background: t.card, borderRadius: 14, padding: '18px 20px', border: `1px solid ${t.border}` }}>
+            <p style={{ fontSize: 12, color: t.textSecondary, marginBottom: 4 }}>Hotels Logged</p>
+            <p style={{ fontSize: 24, fontWeight: 700, color: t.textPrimary, fontFamily: "'Playfair Display', serif" }}>{hotels.length}</p>
+          </div>
+          <div style={{ background: t.card, borderRadius: 14, padding: '18px 20px', border: `1px solid ${t.border}` }}>
+            <p style={{ fontSize: 12, color: t.textSecondary, marginBottom: 4 }}>Total Nights</p>
+            <p style={{ fontSize: 24, fontWeight: 700, color: t.textPrimary, fontFamily: "'Playfair Display', serif" }}>
+              {hotels.reduce((sum, h) => sum + h.nights, 0)}
+            </p>
           </div>
         </div>
       )}
 
-      {/* Hotels List */}
       {selectedTrip ? (
-        <div className="space-y-4">
-          {loading ? (
-            <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-            </div>
-          ) : hotels.length > 0 ? (
-            hotels.map((hotel) => (
-              <div key={hotel.id} className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <Hotel className="h-5 w-5 text-primary-600" />
-                      <h3 className="text-lg font-semibold text-gray-900">{hotel.hotel_name}</h3>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                      <div className="flex items-center space-x-2 text-gray-600">
-                        <DollarSign className="h-4 w-4" />
-                        <span>₹{hotel.cost_per_night?.toLocaleString()} / night</span>
+        loading ? <Spinner /> : hotels.length === 0 ? (
+          <EmptyState icon="🏨" title="No hotels logged" desc="Add your accommodation details for this trip" action={<Btn onClick={openNew}><PlusIcon /> Add First Hotel</Btn>} />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {hotels.map(hotel => (
+              <Card key={hotel.id} hover>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  {/* Icon */}
+                  <div style={{ width: 50, height: 50, borderRadius: 13, background: 'linear-gradient(135deg,#f97316,#fb923c)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0, boxShadow: '0 4px 12px rgba(249,115,22,0.25)' }}>🏨</div>
+
+                  {/* Details */}
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: t.textPrimary, marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>{hotel.hotel_name}</h3>
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: t.textSecondary }}>
+                        💰 ₹{hotel.cost_per_night?.toLocaleString()} / night
                       </div>
-                      <div className="flex items-center space-x-2 text-gray-600">
-                        <Moon className="h-4 w-4" />
-                        <span>{hotel.nights} nights</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-600">Total:</span>
-                        <span className="font-semibold text-gray-900">₹{hotel.total_cost?.toLocaleString()}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: t.textSecondary }}>
+                        <MoonIcon /> {hotel.nights} night{hotel.nights > 1 ? 's' : ''}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex space-x-2 ml-4">
-                    <button
-                      onClick={() => handleEdit(hotel)}
-                      className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors"
-                    >
-                      <Edit2 className="h-4 w-4" />
+                  {/* Total cost */}
+                  <div style={{ textAlign: 'right', marginRight: 12 }}>
+                    <p style={{ fontSize: 11, color: t.textMuted, marginBottom: 2 }}>Total</p>
+                    <p style={{ fontSize: 20, fontWeight: 700, color: '#f97316', fontFamily: "'Playfair Display', serif" }}>₹{hotel.total_cost?.toLocaleString()}</p>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => openEdit(hotel)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${t.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.textSecondary }}>
+                      <EditIcon />
                     </button>
-                    <button
-                      onClick={() => handleDelete(hotel.id)}
-                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
+                    <button onClick={() => handleDelete(hotel.id)} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(239,68,68,0.25)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444' }}>
+                      <TrashIcon />
                     </button>
                   </div>
                 </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-12">
-              <Hotel className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No hotels added yet</h3>
-              <p className="text-gray-600 mb-4">Start adding your accommodation details</p>
-              <button
-                onClick={() => {
-                  setFormData({...formData, trip_id: selectedTrip})
-                  setShowForm(true)
-                }}
-                className="btn-primary"
-              >
-                Add Your First Hotel
-              </button>
-            </div>
-          )}
-        </div>
+              </Card>
+            ))}
+          </div>
+        )
       ) : (
-        <div className="text-center py-12">
-          <Hotel className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Select a trip</h3>
-          <p className="text-gray-600">Choose a trip to start adding hotels</p>
-        </div>
+        <EmptyState icon="🏨" title="Select a trip" desc="Choose a trip to view and add hotels" />
       )}
-    </div>
+
+      {showForm && (
+        <Modal title={editing ? 'Edit Hotel' : 'Add Hotel'} onClose={closeForm}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <Select label="Trip" {...f('trip_id')} required>
+              <option value="">Select a trip…</option>
+              {trips.map(tr => <option key={tr.id} value={tr.id}>{tr.trip_name} — {tr.destination}</option>)}
+            </Select>
+            <Input label="Hotel Name" {...f('hotel_name')} required placeholder="Taj Resort & Convention Centre" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Input label="Cost per Night (₹)" type="number" {...f('cost_per_night')} required min="0" step="0.01" placeholder="8000" />
+              <Input label="Number of Nights" type="number" {...f('nights')} required min="1" placeholder="4" />
+            </div>
+            {totalCost > 0 && (
+              <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: '#f97316', fontWeight: 600 }}>Total Cost</span>
+                <span style={{ fontSize: 18, fontWeight: 700, color: '#f97316', fontFamily: "'Playfair Display', serif" }}>₹{totalCost.toLocaleString()}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <Btn type="submit" style={{ flex: 1 }}>{editing ? 'Update' : 'Add'} Hotel</Btn>
+              <Btn variant="outline" onClick={closeForm} style={{ flex: 1 }}>Cancel</Btn>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
   )
 }
-
-export default HotelLogger

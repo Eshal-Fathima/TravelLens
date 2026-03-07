@@ -1,355 +1,166 @@
 import { useState, useEffect } from 'react'
 import api from '../utils/axios'
-import { Plus, Edit2, Trash2, MapPin, Star, Save, X, Filter } from 'lucide-react'
+import { useTheme } from './ThemeContext'
+import { PageHeader, Card, Btn, Input, Select, Modal, Badge, EmptyState, Spinner, TripSelector } from './UI'
 
-const PlacesLogger = () => {
-  const [places, setPlaces] = useState([])
-  const [trips, setTrips] = useState([])
-  const [selectedTrip, setSelectedTrip] = useState('')
-  const [showForm, setShowForm] = useState(false)
-  const [editingPlace, setEditingPlace] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [formData, setFormData] = useState({
-    trip_id: '',
-    place_name: '',
-    category: 'Beach',
-    rating: '',
-    notes: ''
-  })
+const PlusIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+const EditIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+const TrashIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
+const StarFill = ({ filled }) => <svg width="14" height="14" viewBox="0 0 24 24" fill={filled ? "#f59e0b" : "none"} stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
 
-  const categories = ['Beach', 'Fort', 'Museum', 'Temple', 'Mountain', 'Park', 'Restaurant', 'Shopping', 'Entertainment', 'Historical', 'Other']
+const CAT_COLORS = { Beach: '#3b82f6', Fort: '#78716c', Museum: '#8b5cf6', Temple: '#f97316', Mountain: '#10b981', Park: '#22c55e', Restaurant: '#ef4444', Shopping: '#ec4899', Entertainment: '#a855f7', Historical: '#f59e0b', Other: '#6b7280' }
+const CAT_ICONS = { Beach: '🏖️', Fort: '🏰', Museum: '🏛️', Temple: '🛕', Mountain: '⛰️', Park: '🌳', Restaurant: '🍽️', Shopping: '🛍️', Entertainment: '🎭', Historical: '🏺', Other: '📍' }
+const CATEGORIES = ['Beach', 'Fort', 'Museum', 'Temple', 'Mountain', 'Park', 'Restaurant', 'Shopping', 'Entertainment', 'Historical', 'Other']
 
-  useEffect(() => {
-    fetchTrips()
-  }, [])
+const defaultForm = { trip_id: '', place_name: '', category: 'Beach', rating: '', notes: '' }
 
-  useEffect(() => {
-    if (selectedTrip) {
-      fetchPlaces(selectedTrip)
-    }
-  }, [selectedTrip])
-
-  const fetchTrips = async () => {
-    try {
-      const response = await api.get('/api/trips')
-      setTrips(response.data.trips)
-      if (response.data.trips.length > 0 && !selectedTrip) {
-        setSelectedTrip(response.data.trips[0].id)
-      }
-    } catch (error) {
-      console.error('Error fetching trips:', error)
-    }
-  }
-
-  const fetchPlaces = async (tripId) => {
-    try {
-      setLoading(true)
-      const response = await api.get(`/api/places/${tripId}`)
-      setPlaces(response.data.places)
-    } catch (error) {
-      console.error('Error fetching places:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const resetForm = () => {
-    setFormData({
-      trip_id: selectedTrip,
-      place_name: '',
-      category: 'Beach',
-      rating: '',
-      notes: ''
-    })
-    setEditingPlace(null)
-    setShowForm(false)
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    try {
-      const data = {
-        ...formData,
-        rating: formData.rating ? parseFloat(formData.rating) : null
-      }
-
-      if (editingPlace) {
-        await api.put(`/api/places/${editingPlace.id}`, data)
-      } else {
-        await api.post('/api/places', data)
-      }
-      
-      fetchPlaces(selectedTrip)
-      resetForm()
-    } catch (error) {
-      console.error('Error saving place:', error)
-      alert('Error saving place. Please try again.')
-    }
-  }
-
-  const handleEdit = (place) => {
-    setEditingPlace(place)
-    setFormData({
-      trip_id: place.trip_id,
-      place_name: place.place_name,
-      category: place.category,
-      rating: place.rating || '',
-      notes: place.notes || ''
-    })
-    setShowForm(true)
-  }
-
-  const handleDelete = async (placeId) => {
-    if (window.confirm('Are you sure you want to delete this place?')) {
-      try {
-        await api.delete(`/api/places/${placeId}`)
-        fetchPlaces(selectedTrip)
-      } catch (error) {
-        console.error('Error deleting place:', error)
-        alert('Error deleting place. Please try again.')
-      }
-    }
-  }
-
-  const getCategoryColor = (category) => {
-    const colors = {
-      'Beach': 'bg-blue-100 text-blue-800',
-      'Fort': 'bg-gray-100 text-gray-800',
-      'Museum': 'bg-purple-100 text-purple-800',
-      'Temple': 'bg-orange-100 text-orange-800',
-      'Mountain': 'bg-green-100 text-green-800',
-      'Park': 'bg-emerald-100 text-emerald-800',
-      'Restaurant': 'bg-red-100 text-red-800',
-      'Shopping': 'bg-pink-100 text-pink-800',
-      'Entertainment': 'bg-indigo-100 text-indigo-800',
-      'Historical': 'bg-amber-100 text-amber-800',
-      'Other': 'bg-gray-100 text-gray-800'
-    }
-    return colors[category] || colors['Other']
-  }
-
+const StarRating = ({ value, onChange }) => {
+  const num = parseFloat(value) || 0
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Places Logger</h1>
-          <p className="text-gray-600 mt-2">Track places you visit during your trips</p>
-        </div>
-        <button
-          onClick={() => {
-            setFormData({...formData, trip_id: selectedTrip})
-            setShowForm(true)
-          }}
-          disabled={!selectedTrip}
-          className="btn-primary flex items-center space-x-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Add Place</span>
+    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+      {[1, 2, 3, 4, 5].map(s => (
+        <button key={s} type="button" onClick={() => onChange({ target: { value: s.toString() } })} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+          <StarFill filled={s <= num} />
         </button>
-      </div>
-
-      {/* Trip Selector */}
-      <div className="mb-6">
-        <label className="label mb-2 block">Select Trip</label>
-        <div className="flex items-center space-x-4">
-          <select
-            value={selectedTrip}
-            onChange={(e) => setSelectedTrip(e.target.value)}
-            className="input flex-1 max-w-xs"
-          >
-            <option value="">Choose a trip...</option>
-            {trips.map((trip) => (
-              <option key={trip.id} value={trip.id}>
-                {trip.trip_name} - {trip.destination}
-              </option>
-            ))}
-          </select>
-          <Filter className="h-5 w-5 text-gray-400" />
-        </div>
-      </div>
-
-      {/* Place Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                {editingPlace ? 'Edit Place' : 'Add New Place'}
-              </h2>
-              <button
-                onClick={resetForm}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="label">Trip</label>
-                <select
-                  required
-                  className="input"
-                  value={formData.trip_id}
-                  onChange={(e) => setFormData({...formData, trip_id: e.target.value})}
-                >
-                  <option value="">Select a trip...</option>
-                  {trips.map((trip) => (
-                    <option key={trip.id} value={trip.id}>
-                      {trip.trip_name} - {trip.destination}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="label">Place Name</label>
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  value={formData.place_name}
-                  onChange={(e) => setFormData({...formData, place_name: e.target.value})}
-                  placeholder="Taj Mahal"
-                />
-              </div>
-
-              <div>
-                <label className="label">Category</label>
-                <select
-                  required
-                  className="input"
-                  value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
-                >
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="label">Rating (1-5)</label>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    step="0.1"
-                    className="input"
-                    value={formData.rating}
-                    onChange={(e) => setFormData({...formData, rating: e.target.value})}
-                    placeholder="4.5"
-                  />
-                  <Star className="h-5 w-5 text-yellow-500" />
-                </div>
-              </div>
-
-              <div>
-                <label className="label">Notes</label>
-                <textarea
-                  className="input resize-none"
-                  rows="3"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder="Beautiful architecture with amazing history..."
-                />
-              </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="submit"
-                  className="btn-primary flex-1 flex items-center justify-center space-x-2"
-                >
-                  <Save className="h-4 w-4" />
-                  <span>{editingPlace ? 'Update' : 'Add'} Place</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="btn-outline flex-1"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Places List */}
-      {selectedTrip ? (
-        <div className="space-y-4">
-          {loading ? (
-            <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-            </div>
-          ) : places.length > 0 ? (
-            places.map((place) => (
-              <div key={place.id} className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{place.place_name}</h3>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getCategoryColor(place.category)}`}>
-                        {place.category}
-                      </span>
-                      {place.rating && (
-                        <div className="flex items-center space-x-1">
-                          <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                          <span className="text-sm text-gray-600">{place.rating}</span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {place.notes && (
-                      <p className="text-gray-600 text-sm mt-2">{place.notes}</p>
-                    )}
-                  </div>
-
-                  <div className="flex space-x-2 ml-4">
-                    <button
-                      onClick={() => handleEdit(place)}
-                      className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(place.id)}
-                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-12">
-              <MapPin className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No places added yet</h3>
-              <p className="text-gray-600 mb-4">Start adding places you visit during this trip</p>
-              <button
-                onClick={() => {
-                  setFormData({...formData, trip_id: selectedTrip})
-                  setShowForm(true)
-                }}
-                className="btn-primary"
-              >
-                Add Your First Place
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <MapPin className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Select a trip</h3>
-          <p className="text-gray-600">Choose a trip to start adding places</p>
-        </div>
-      )}
+      ))}
+      {num > 0 && <span style={{ fontSize: 12, color: '#f59e0b', marginLeft: 4 }}>{num}/5</span>}
     </div>
   )
 }
 
-export default PlacesLogger
+export default function PlacesLogger() {
+  const { t } = useTheme()
+  const [places, setPlaces] = useState([])
+  const [trips, setTrips] = useState([])
+  const [selectedTrip, setSelectedTrip] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState(defaultForm)
+
+  useEffect(() => {
+    api.get('/api/trips').then(r => {
+      setTrips(r.data.trips)
+      if (r.data.trips.length > 0) setSelectedTrip(r.data.trips[0].id)
+    }).catch(console.error)
+  }, [])
+
+  useEffect(() => { if (selectedTrip) fetchPlaces() }, [selectedTrip])
+
+  const fetchPlaces = async () => {
+    setLoading(true)
+    try { const r = await api.get(`/api/places/${selectedTrip}`); setPlaces(r.data.places) }
+    catch (e) { console.error(e) } finally { setLoading(false) }
+  }
+
+  const openNew = () => { setForm({ ...defaultForm, trip_id: selectedTrip }); setEditing(null); setShowForm(true) }
+  const openEdit = (p) => {
+    setEditing(p)
+    setForm({ trip_id: p.trip_id, place_name: p.place_name, category: p.category, rating: p.rating || '', notes: p.notes || '' })
+    setShowForm(true)
+  }
+  const closeForm = () => { setShowForm(false); setEditing(null) }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      const data = { ...form, rating: form.rating ? parseFloat(form.rating) : null }
+      if (editing) await api.put(`/api/places/${editing.id}`, data)
+      else await api.post('/api/places', data)
+      fetchPlaces(); closeForm()
+    } catch (err) { console.error(err); alert('Error saving place.') }
+  }
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this place?')) return
+    try { await api.delete(`/api/places/${id}`); fetchPlaces() }
+    catch (e) { console.error(e) }
+  }
+
+  const f = (key) => ({ value: form[key], onChange: e => setForm({ ...form, [key]: e.target.value }) })
+
+  return (
+    <>
+      <PageHeader
+        title="Places Logger"
+        subtitle="Track every spot you visit on your travels"
+        action={<Btn onClick={openNew} disabled={!selectedTrip}><PlusIcon /> Add Place</Btn>}
+      />
+
+      <TripSelector trips={trips} value={selectedTrip} onChange={setSelectedTrip} />
+
+      {selectedTrip ? (
+        loading ? <Spinner /> : places.length === 0 ? (
+          <EmptyState icon="📍" title="No places logged" desc="Start adding memorable spots from this trip" action={<Btn onClick={openNew}><PlusIcon /> Add First Place</Btn>} />
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
+            {places.map(place => {
+              const color = CAT_COLORS[place.category] || '#6b7280'
+              const icon = CAT_ICONS[place.category] || '📍'
+              return (
+                <Card key={place.id} hover style={{ padding: 0, overflow: 'hidden' }}>
+                  <div style={{ height: 3, background: `linear-gradient(90deg,${color},${color}66)` }} />
+                  <div style={{ padding: '18px 20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flex: 1 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+                          {icon}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <h3 style={{ fontSize: 15, fontWeight: 700, color: t.textPrimary, marginBottom: 5, fontFamily: "'DM Sans', sans-serif" }}>{place.place_name}</h3>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <Badge color={color}>{place.category}</Badge>
+                            {place.rating && (
+                              <div style={{ display: 'flex', gap: 2 }}>
+                                {[1, 2, 3, 4, 5].map(s => <StarFill key={s} filled={s <= place.rating} />)}
+                              </div>
+                            )}
+                          </div>
+                          {place.notes && <p style={{ fontSize: 12, color: t.textSecondary, marginTop: 8, lineHeight: 1.5 }}>{place.notes}</p>}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 5, flexShrink: 0, marginLeft: 8 }}>
+                        <button onClick={() => openEdit(place)} style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${t.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.textSecondary }}>
+                          <EditIcon />
+                        </button>
+                        <button onClick={() => handleDelete(place.id)} style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid rgba(239,68,68,0.25)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444' }}>
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )
+      ) : (
+        <EmptyState icon="🗺️" title="Select a trip" desc="Choose a trip to view and log places" />
+      )}
+
+      {showForm && (
+        <Modal title={editing ? 'Edit Place' : 'Add Place'} onClose={closeForm}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <Select label="Trip" {...f('trip_id')} required>
+              <option value="">Select a trip…</option>
+              {trips.map(tr => <option key={tr.id} value={tr.id}>{tr.trip_name} — {tr.destination}</option>)}
+            </Select>
+            <Input label="Place Name" {...f('place_name')} required placeholder="Taj Mahal" />
+            <Select label="Category" {...f('category')} required>
+              {CATEGORIES.map(c => <option key={c} value={c}>{CAT_ICONS[c]} {c}</option>)}
+            </Select>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary, letterSpacing: '0.3px', display: 'block', marginBottom: 6 }}>Rating</label>
+              <StarRating value={form.rating} onChange={e => setForm({ ...form, rating: e.target.value })} />
+            </div>
+            <Input label="Notes" as="textarea" {...f('notes')} placeholder="Beautiful architecture with amazing views…" rows={3} />
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <Btn type="submit" style={{ flex: 1 }}>{editing ? 'Update' : 'Add'} Place</Btn>
+              <Btn variant="outline" onClick={closeForm} style={{ flex: 1 }}>Cancel</Btn>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
+  )
+}
