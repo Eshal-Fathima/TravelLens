@@ -1,305 +1,145 @@
 import { useState, useEffect } from 'react'
 import api from '../utils/axios'
-import { Plus, Edit2, Trash2, MapPin, Calendar, DollarSign, Users, Save, X } from 'lucide-react'
+import { useTheme } from './ThemeContext'
+import { PageHeader, Card, Btn, Input, Select, Modal, Badge, EmptyState, Spinner } from './UI'
 
-const TripLogger = () => {
+const PlusIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+const EditIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+const TrashIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
+const CalIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+const PinIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+const WalletIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
+const UsersIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+
+const travelTypeColors = { Solo: '#3b82f6', Family: '#10b981', Friends: '#f97316' }
+
+const defaultForm = { trip_name: '', destination: '', start_date: '', end_date: '', budget: '', travel_type: 'Solo' }
+
+export default function TripLogger() {
+  const { t } = useTheme()
   const [trips, setTrips] = useState([])
-  const [showForm, setShowForm] = useState(false)
-  const [editingTrip, setEditingTrip] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [formData, setFormData] = useState({
-    trip_name: '',
-    destination: '',
-    start_date: '',
-    end_date: '',
-    budget: '',
-    travel_type: 'Solo'
-  })
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState(defaultForm)
 
-  useEffect(() => {
-    fetchTrips()
-  }, [])
+  useEffect(() => { fetchTrips() }, [])
 
   const fetchTrips = async () => {
     try {
-      const response = await api.get('/api/trips')
-      setTrips(response.data.trips)
-    } catch (error) {
-      console.error('Error fetching trips:', error)
-    } finally {
-      setLoading(false)
-    }
+      const r = await api.get('/api/trips')
+      setTrips(r.data.trips)
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
   }
 
-  const resetForm = () => {
-    setFormData({
-      trip_name: '',
-      destination: '',
-      start_date: '',
-      end_date: '',
-      budget: '',
-      travel_type: 'Solo'
-    })
-    setEditingTrip(null)
-    setShowForm(false)
+  const openNew = () => { setForm(defaultForm); setEditing(null); setShowForm(true) }
+  const openEdit = (trip) => {
+    setEditing(trip)
+    setForm({ trip_name: trip.trip_name, destination: trip.destination, start_date: trip.start_date?.split('T')[0] || '', end_date: trip.end_date?.split('T')[0] || '', budget: trip.budget?.toString() || '', travel_type: trip.travel_type })
+    setShowForm(true)
   }
+  const closeForm = () => { setShowForm(false); setEditing(null) }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const data = { ...form, budget: parseFloat(form.budget) }
+    if (isNaN(data.budget) || data.budget <= 0) { alert('Enter a valid budget'); return }
     try {
-      // Convert budget to number and validate data
-      const submissionData = {
-        ...formData,
-        budget: parseFloat(formData.budget)
-      }
-      
-      // Validate budget is a valid number
-      if (isNaN(submissionData.budget) || submissionData.budget <= 0) {
-        alert('Please enter a valid budget amount')
-        return
-      }
-      
-      if (editingTrip) {
-        await api.put(`/api/trips/${editingTrip.id}`, submissionData)
-      } else {
-        await api.post('/api/trips', submissionData)
-      }
-      
-      fetchTrips()
-      resetForm()
-    } catch (error) {
-      console.error('Error saving trip:', error)
-      alert('Error saving trip. Please try again.')
-    }
+      if (editing) await api.put(`/api/trips/${editing.id}`, data)
+      else await api.post('/api/trips', data)
+      fetchTrips(); closeForm()
+    } catch (err) { console.error(err); alert('Error saving trip.') }
   }
 
-  const handleEdit = (trip) => {
-    setEditingTrip(trip)
-    setFormData({
-      trip_name: trip.trip_name,
-      destination: trip.destination,
-      start_date: trip.start_date?.split('T')[0] || '',
-      end_date: trip.end_date?.split('T')[0] || '',
-      budget: trip.budget?.toString() || '',
-      travel_type: trip.travel_type
-    })
-    setShowForm(true)
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this trip?')) return
+    try { await api.delete(`/api/trips/${id}`); fetchTrips() }
+    catch (e) { console.error(e) }
   }
 
-  const handleDelete = async (tripId) => {
-    if (window.confirm('Are you sure you want to delete this trip?')) {
-      try {
-        await api.delete(`/api/trips/${tripId}`)
-        fetchTrips()
-      } catch (error) {
-        console.error('Error deleting trip:', error)
-        alert('Error deleting trip. Please try again.')
-      }
-    }
-  }
+  const f = (key) => ({ value: form[key], onChange: e => setForm({ ...form, [key]: e.target.value }) })
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    )
+  const getDuration = (start, end) => {
+    const d = Math.ceil((new Date(end) - new Date(start)) / 86400000)
+    return d > 0 ? `${d} day${d > 1 ? 's' : ''}` : null
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Trip Logger</h1>
-          <p className="text-gray-600 mt-2">Manage your travel adventures</p>
-        </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="btn-primary flex items-center space-x-2 px-4 py-2"
-        >
-          <Plus className="h-5 w-5" />
-          <span>New Trip</span>
-        </button>
-      </div>
+    <>
+      <PageHeader
+        title="Trip Logger"
+        subtitle="Manage and track all your travel adventures"
+        action={<Btn onClick={openNew}><PlusIcon /> New Trip</Btn>}
+      />
 
-      {/* Trip Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                {editingTrip ? 'Edit Trip' : 'Create New Trip'}
-              </h2>
-              <button
-                onClick={resetForm}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
+      {loading ? <Spinner /> : trips.length === 0 ? (
+        <EmptyState icon="✈️" title="No trips yet" desc="Create your first trip to start your travel journal" action={<Btn onClick={openNew}><PlusIcon /> Create First Trip</Btn>} />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+          {trips.map(trip => {
+            const duration = getDuration(trip.start_date, trip.end_date)
+            const color = travelTypeColors[trip.travel_type] || '#3b82f6'
+            return (
+              <Card key={trip.id} hover style={{ padding: 0, overflow: 'hidden' }}>
+                {/* Color bar */}
+                <div style={{ height: 4, background: `linear-gradient(90deg, ${color}, ${color}88)` }} />
+                <div style={{ padding: '20px 22px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div>
+                      <h3 style={{ fontSize: 16, fontWeight: 700, color: t.textPrimary, marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>{trip.trip_name}</h3>
+                      <Badge color={color}>{trip.travel_type}</Badge>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => openEdit(trip)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${t.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.textSecondary, transition: 'all 0.18s' }}>
+                        <EditIcon />
+                      </button>
+                      <button onClick={() => handleDelete(trip.id)} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(239,68,68,0.25)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', transition: 'all 0.18s' }}>
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="label">Trip Name</label>
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  value={formData.trip_name}
-                  onChange={(e) => setFormData({...formData, trip_name: e.target.value})}
-                  placeholder="Summer Vacation 2024"
-                />
-              </div>
-
-              <div>
-                <label className="label">Destination</label>
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  value={formData.destination}
-                  onChange={(e) => setFormData({...formData, destination: e.target.value})}
-                  placeholder="Goa, India"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Start Date</label>
-                  <input
-                    type="date"
-                    required
-                    className="input"
-                    value={formData.start_date}
-                    onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: t.textSecondary }}>
+                      <PinIcon />{trip.destination}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: t.textSecondary }}>
+                      <CalIcon />
+                      {new Date(trip.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {new Date(trip.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {duration && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: `${color}15`, color }}>{duration}</span>}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: t.textSecondary }}>
+                      <WalletIcon />Budget: <strong style={{ color: t.textPrimary }}>₹{trip.budget?.toLocaleString()}</strong>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="label">End Date</label>
-                  <input
-                    type="date"
-                    required
-                    className="input"
-                    value={formData.end_date}
-                    onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-                    min={formData.start_date}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="label">Budget (₹)</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="0.01"
-                  className="input"
-                  value={formData.budget}
-                  onChange={(e) => setFormData({...formData, budget: e.target.value})}
-                  placeholder="25000"
-                />
-              </div>
-
-              <div>
-                <label className="label">Travel Type</label>
-                <select
-                  className="input"
-                  value={formData.travel_type}
-                  onChange={(e) => setFormData({...formData, travel_type: e.target.value})}
-                >
-                  <option value="Solo">Solo</option>
-                  <option value="Family">Family</option>
-                  <option value="Friends">Friends</option>
-                </select>
-              </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="submit"
-                  className="btn-primary flex-1 flex items-center justify-center space-x-2"
-                >
-                  <Save className="h-4 w-4" />
-                  <span>{editingTrip ? 'Update' : 'Create'} Trip</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="btn-outline flex-1"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
+              </Card>
+            )
+          })}
         </div>
       )}
 
-      {/* Trips List */}
-      <div className="space-y-4">
-        {trips.length > 0 ? (
-          trips.map((trip) => (
-            <div key={trip.id} className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">{trip.trip_name}</h3>
-                    <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                      {trip.travel_type}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div className="flex items-center space-x-2 text-gray-600">
-                      <MapPin className="h-4 w-4" />
-                      <span>{trip.destination}</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-gray-600">
-                      <Calendar className="h-4 w-4" />
-                      <span>
-                        {new Date(trip.start_date).toLocaleDateString()} - {new Date(trip.end_date).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-gray-600">
-                      <DollarSign className="h-4 w-4" />
-                      <span>Budget: ₹{trip.budget?.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex space-x-2 ml-4">
-                  <button
-                    onClick={() => handleEdit(trip)}
-                    className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(trip.id)}
-                    className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+      {showForm && (
+        <Modal title={editing ? 'Edit Trip' : 'New Trip'} onClose={closeForm}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <Input label="Trip Name" {...f('trip_name')} required placeholder="Summer Vacation 2025" />
+            <Input label="Destination" {...f('destination')} required placeholder="Goa, India" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Input label="Start Date" type="date" {...f('start_date')} required />
+              <Input label="End Date" type="date" {...f('end_date')} required min={form.start_date} />
             </div>
-          ))
-        ) : (
-          <div className="text-center py-12">
-            <MapPin className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No trips yet</h3>
-            <p className="text-gray-600 mb-4">Start your travel journey by creating your first trip</p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="btn-primary"
-            >
-              Create Your First Trip
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+            <Input label="Budget (₹)" type="number" {...f('budget')} required min="0" step="0.01" placeholder="25000" />
+            <Select label="Travel Type" {...f('travel_type')} required>
+              {['Solo', 'Family', 'Friends'].map(v => <option key={v} value={v}>{v}</option>)}
+            </Select>
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <Btn type="submit" style={{ flex: 1 }}>{editing ? 'Update Trip' : 'Create Trip'}</Btn>
+              <Btn variant="outline" onClick={closeForm} style={{ flex: 1 }}>Cancel</Btn>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
   )
 }
-
-export default TripLogger
