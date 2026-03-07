@@ -38,31 +38,35 @@ export default function Dashboard() {
   const [placeStats, setPlaceStats] = useState({ total: 0, topCategory: '—' })
   const [recs, setRecs] = useState(null)
   const [animatedStats, setAnimatedStats] = useState({ totalTrips: 0, totalSpent: 0, placesVisited: 0, hotels: 0 })
+  const [finalStats, setFinalStats] = useState(null) // triggers animation via useEffect
 
   useEffect(() => {
     if (user && !authLoading) fetchAll()
   }, [user, authLoading])
 
-  // Animate a set of numeric targets
-  const animateTo = (targets) => {
-    const steps = 60, ms = 1800
-    const inc = Object.fromEntries(Object.entries(targets).map(([k, v]) => [k, v / steps]))
+  // Animate when finalStats is set
+  useEffect(() => {
+    if (!finalStats) return
+    const keys = Object.keys(finalStats)
+    const steps = 50, ms = 1500
+    const inc = {}
+    keys.forEach(k => { inc[k] = finalStats[k] / steps })
     let s = 0
     const timer = setInterval(() => {
       s++
-      if (s <= steps) {
+      if (s < steps) {
         setAnimatedStats(prev => {
           const next = { ...prev }
-          Object.keys(targets).forEach(k => { next[k] = Math.floor(inc[k] * s) })
+          keys.forEach(k => { next[k] = Math.floor(inc[k] * s) })
           return next
         })
       } else {
         clearInterval(timer)
-        setAnimatedStats(prev => ({ ...prev, ...targets }))
+        setAnimatedStats({ ...finalStats })
       }
     }, ms / steps)
     return () => clearInterval(timer)
-  }
+  }, [finalStats])
 
   const fetchAll = async () => {
     try {
@@ -134,16 +138,15 @@ export default function Dashboard() {
         const topCat = Object.entries(catCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '—'
         setPlaceStats({ total: allPlaces.length, topCategory: topCat })
 
-        // Animate all stats together once we have everything
-        animateTo({
+        // Set final stats — useEffect will animate them
+        setFinalStats({
           totalTrips: rawTripCount,
           totalSpent: Math.max(rawTripSpend, insightsData?.total_spent || 0),
           placesVisited: allPlaces.length,
           hotels: allHotels.length,
         })
       } else {
-        // No trips at all — still animate from raw count (will be 0s)
-        animateTo({ totalTrips: rawTripCount, totalSpent: rawTripSpend, placesVisited: 0, hotels: 0 })
+        setFinalStats({ totalTrips: rawTripCount, totalSpent: rawTripSpend, placesVisited: 0, hotels: 0 })
       }
 
     } catch (e) {
