@@ -1,227 +1,160 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/axios'
-import { BarChart3, TrendingUp, Globe, Star, MapPin, Calendar, DollarSign, Users, Award, Target } from 'lucide-react'
+import { useTheme } from './ThemeContext'
+import { Card, Spinner, EmptyState, Badge, SectionTitle } from './UI'
 
-const Insights = () => {
+const PERSONALITY_META = {
+  'Budget Explorer': { emoji: '🎒', color: '#10b981', desc: "You love exploring the world while being smart with your money. Budget travel doesn't mean compromising on experiences!" },
+  'Smart Traveler': { emoji: '🧠', color: '#3b82f6', desc: "You strike the perfect balance between comfort and cost. You know how to get the best value for your money." },
+  'Comfort Seeker': { emoji: '🛋️', color: '#8b5cf6', desc: "You believe in traveling comfortably and are willing to invest in premium experiences." },
+  'Luxury Traveler': { emoji: '💎', color: '#f59e0b', desc: "You spare no expense. Luxury, exclusivity, and premium experiences are your hallmark." },
+  'New Traveler': { emoji: '🌱', color: '#6b7280', desc: "You're just beginning your travel journey. Every trip is a new adventure!" },
+}
+
+const PREF_ICONS = { Beach: '🏖️', Mountain: '⛰️', Cultural: '🏛️', City: '🏙️' }
+
+export default function Insights() {
   const { user } = useAuth()
+  const { t } = useTheme()
   const [insights, setInsights] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchInsights()
+    api.get(`/api/insights/${user.id}`)
+      .then(r => setInsights(r.data.insights))
+      .catch(console.error)
+      .finally(() => setLoading(false))
   }, [])
 
-  const fetchInsights = async () => {
-    try {
-      const response = await api.get(`/api/insights/${user.id}`)
-      setInsights(response.data.insights)
-    } catch (error) {
-      console.error('Error fetching insights:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  if (loading) return <Spinner />
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    )
-  }
-
-  const getPersonalityColor = (personality) => {
-    const colors = {
-      'Budget Explorer': 'text-green-600 bg-green-100',
-      'Smart Traveler': 'text-blue-600 bg-blue-100',
-      'Comfort Seeker': 'text-purple-600 bg-purple-100',
-      'Luxury Traveler': 'text-yellow-600 bg-yellow-100',
-      'New Traveler': 'text-gray-600 bg-gray-100'
-    }
-    return colors[personality] || colors['New Traveler']
-  }
-
-  const getPreferenceIcon = (preference) => {
-    if (preference?.includes('Beach')) return '🌊'
-    if (preference?.includes('Mountain')) return '🏔️'
-    if (preference?.includes('Cultural')) return '🏛️'
-    if (preference?.includes('City')) return '🏙️'
-    return '🗺️'
-  }
+  const meta = PERSONALITY_META[insights?.travel_personality] || PERSONALITY_META['New Traveler']
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Your Travel Wrapped</h1>
-        <p className="text-xl text-gray-600">Discover your travel personality and journey highlights</p>
-        <div className="mt-4 inline-flex items-center px-4 py-2 bg-primary-100 text-primary-800 rounded-full">
-          <Calendar className="h-5 w-5 mr-2" />
-          <span className="font-medium">{new Date().getFullYear()} Travel Summary</span>
-        </div>
+    <div>
+      {/* Page header */}
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 700, color: t.textPrimary, marginBottom: 4 }}>Travel Wrapped</h1>
+        <p style={{ fontSize: 14, color: t.textSecondary }}>Your personalized travel insights for {new Date().getFullYear()}</p>
       </div>
 
       {!insights || insights.total_trips === 0 ? (
-        <div className="text-center py-16">
-          <MapPin className="h-24 w-24 text-gray-400 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">No Travel Data Yet</h2>
-          <p className="text-gray-600 mb-8 max-w-md mx-auto">
-            Start logging your trips to see your personalized travel insights and analytics
-          </p>
-          <button className="btn-primary px-6 py-3">
-            Start Your First Trip
-          </button>
-        </div>
+        <EmptyState icon="🗺️" title="No travel data yet" desc="Start logging your trips to unlock your personalized travel insights and yearly wrapped" />
       ) : (
-        <div className="space-y-8">
-          {/* Top Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl text-white">
-              <div className="flex items-center justify-between mb-4">
-                <Globe className="h-8 w-8 opacity-80" />
-                <span className="text-3xl font-bold">{insights.total_trips}</span>
-              </div>
-              <h3 className="text-lg font-medium">Total Trips</h3>
-              <p className="text-blue-100 text-sm mt-1">Adventures taken</p>
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-            <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-xl text-white">
-              <div className="flex items-center justify-between mb-4">
-                <DollarSign className="h-8 w-8 opacity-80" />
-                <span className="text-3xl font-bold">₹{(insights.total_spent / 1000).toFixed(0)}K</span>
+          {/* Top stat cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14 }}>
+            {[
+              { label: 'Total Trips', value: insights.total_trips, icon: '✈️', grad: 'linear-gradient(135deg,#3b82f6,#6366f1)' },
+              { label: 'Total Spent', value: `₹${(insights.total_spent / 1000).toFixed(0)}K`, icon: '💸', grad: 'linear-gradient(135deg,#10b981,#059669)' },
+              { label: 'Places Explored', value: insights.countries_visited, icon: '📍', grad: 'linear-gradient(135deg,#8b5cf6,#7c3aed)' },
+              { label: 'Trips per Year', value: insights.travel_frequency, icon: '📅', grad: 'linear-gradient(135deg,#f97316,#ea580c)' },
+            ].map(card => (
+              <div key={card.label} style={{
+                borderRadius: 14, overflow: 'hidden',
+                background: card.grad, padding: '22px',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
+              }}>
+                <div style={{ fontSize: 28, marginBottom: 12 }}>{card.icon}</div>
+                <p style={{ fontSize: 30, fontWeight: 700, color: 'white', fontFamily: "'Playfair Display', serif", letterSpacing: '-1px', marginBottom: 4 }}>{card.value}</p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>{card.label}</p>
               </div>
-              <h3 className="text-lg font-medium">Total Spent</h3>
-              <p className="text-green-100 text-sm mt-1">Invested in memories</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl text-white">
-              <div className="flex items-center justify-between mb-4">
-                <MapPin className="h-8 w-8 opacity-80" />
-                <span className="text-3xl font-bold">{insights.countries_visited}</span>
-              </div>
-              <h3 className="text-lg font-medium">Places Explored</h3>
-              <p className="text-purple-100 text-sm mt-1">Destinations discovered</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-6 rounded-xl text-white">
-              <div className="flex items-center justify-between mb-4">
-                <TrendingUp className="h-8 w-8 opacity-80" />
-                <span className="text-3xl font-bold">{insights.travel_frequency}</span>
-              </div>
-              <h3 className="text-lg font-medium">Trips per Year</h3>
-              <p className="text-orange-100 text-sm mt-1">Travel frequency</p>
-            </div>
+            ))}
           </div>
 
-          {/* Travel Personality Card */}
-          <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-200">
-            <div className="text-center">
-              <Award className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Travel Personality</h2>
-              <div className={`inline-flex items-center px-6 py-3 rounded-full text-lg font-bold ${getPersonalityColor(insights.travel_personality)}`}>
-                <Star className="h-6 w-6 mr-2" />
-                {insights.travel_personality}
-              </div>
-              <p className="text-gray-600 mt-4 max-w-2xl mx-auto">
-                {insights.travel_personality === 'Budget Explorer' && 'You love exploring the world while being smart with your money. Budget travel doesn\'t mean compromising on experiences!'}
-                {insights.travel_personality === 'Smart Traveler' && 'You strike the perfect balance between comfort and cost. You know how to get the best value for your money while enjoying quality experiences.'}
-                {insights.travel_personality === 'Comfort Seeker' && 'You believe in traveling comfortably and are willing to invest in premium experiences. Comfort and convenience are your priorities.'}
-                {insights.travel_personality === 'Luxury Traveler' && 'You spare no expense when it comes to travel. Luxury, exclusivity, and premium experiences are what you seek.'}
-                {insights.travel_personality === 'New Traveler' && 'You\'re just beginning your travel journey. Every trip is a new adventure and you\'re discovering your travel style.'}
-              </p>
-            </div>
-          </div>
+          {/* Travel Personality hero */}
+          <Card style={{ background: t.dark ? `${meta.color}10` : `${meta.color}08`, border: `1px solid ${meta.color}30`, textAlign: 'center', padding: '36px 28px' }}>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>{meta.emoji}</div>
+            <p style={{ fontSize: 13, color: t.textSecondary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: 600 }}>Your Travel Personality</p>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 700, color: meta.color, marginBottom: 12 }}>{insights.travel_personality}</h2>
+            <p style={{ fontSize: 15, color: t.textSecondary, maxWidth: 520, margin: '0 auto', lineHeight: 1.7 }}>{meta.desc}</p>
+          </Card>
 
-          {/* Travel Preferences */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-              <div className="flex items-center mb-4">
-                <Target className="h-6 w-6 text-primary-600 mr-2" />
-                <h2 className="text-xl font-bold text-gray-900">Travel Preference</h2>
+          {/* Preferences & Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {/* Travel preference */}
+            <Card>
+              <SectionTitle>Travel Vibe</SectionTitle>
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ fontSize: 52, marginBottom: 10 }}>{PREF_ICONS[insights.travel_preference?.split(' ')[0]] || '🗺️'}</div>
+                <p style={{ fontSize: 22, fontWeight: 700, color: t.textPrimary, fontFamily: "'Playfair Display', serif" }}>{insights.travel_preference || 'N/A'}</p>
+                <p style={{ fontSize: 13, color: t.textSecondary, marginTop: 4 }}>Your signature travel style</p>
               </div>
-              <div className="text-center py-6">
-                <div className="text-6xl mb-4">{getPreferenceIcon(insights.travel_preference)}</div>
-                <p className="text-2xl font-bold text-gray-900">{insights.travel_preference}</p>
-                <p className="text-gray-600 mt-2">Your travel vibe</p>
-              </div>
-            </div>
+            </Card>
 
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-              <div className="flex items-center mb-4">
-                <BarChart3 className="h-6 w-6 text-primary-600 mr-2" />
-                <h2 className="text-xl font-bold text-gray-900">Travel Stats</h2>
+            {/* Quick stats */}
+            <Card>
+              <SectionTitle>Travel Stats</SectionTitle>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {[
+                  { label: 'Most Visited', value: insights.most_visited_destination || 'N/A' },
+                  { label: 'Favorite Type', value: insights.favorite_place_category || 'N/A' },
+                  { label: 'Avg Trip Cost', value: `₹${insights.average_trip_cost?.toLocaleString() || 0}` },
+                ].map(row => (
+                  <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 10, background: t.dark ? 'rgba(255,255,255,0.03)' : '#f8fafc' }}>
+                    <span style={{ fontSize: 13, color: t.textSecondary }}>{row.label}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: t.textPrimary }}>{row.value}</span>
+                  </div>
+                ))}
               </div>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <span className="text-gray-600">Most Visited</span>
-                  <span className="font-bold text-gray-900">{insights.most_visited_destination || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <span className="text-gray-600">Favorite Place Type</span>
-                  <span className="font-bold text-gray-900">{insights.favorite_place_category || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <span className="text-gray-600">Average Trip Cost</span>
-                  <span className="font-bold text-gray-900">₹{insights.average_trip_cost?.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
+            </Card>
           </div>
 
           {/* Budget Analysis */}
           {insights.budget_analysis && (
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-              <div className="flex items-center mb-6">
-                <DollarSign className="h-6 w-6 text-primary-600 mr-2" />
-                <h2 className="text-xl font-bold text-gray-900">Budget Analysis</h2>
+            <Card>
+              <SectionTitle>Budget Analysis</SectionTitle>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
+                {[
+                  { label: 'Total Budget', value: `₹${insights.budget_analysis.total_budget?.toLocaleString()}` },
+                  { label: 'Actual Spending', value: `₹${insights.budget_analysis.total_spent?.toLocaleString()}` },
+                  { label: 'Budget Utilization', value: `${insights.budget_analysis.budget_utilization}%` },
+                ].map(item => (
+                  <div key={item.label} style={{ textAlign: 'center', padding: '16px', borderRadius: 12, background: t.dark ? 'rgba(255,255,255,0.03)' : '#f8fafc' }}>
+                    <p style={{ fontSize: 12, color: t.textSecondary, marginBottom: 6 }}>{item.label}</p>
+                    <p style={{ fontSize: 22, fontWeight: 700, color: t.textPrimary, fontFamily: "'Playfair Display', serif" }}>{item.value}</p>
+                  </div>
+                ))}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Total Budget</p>
-                  <p className="text-2xl font-bold text-gray-900">₹{insights.budget_analysis.total_budget?.toLocaleString()}</p>
+              {/* Progress bar */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: t.textSecondary }}>Budget used</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: insights.budget_analysis.budget_utilization > 100 ? '#ef4444' : '#10b981' }}>
+                    {insights.budget_analysis.budget_utilization}%
+                  </span>
                 </div>
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Actual Spending</p>
-                  <p className="text-2xl font-bold text-gray-900">₹{insights.budget_analysis.total_spent?.toLocaleString()}</p>
-                </div>
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Budget Utilization</p>
-                  <p className="text-2xl font-bold text-gray-900">{insights.budget_analysis.budget_utilization}%</p>
+                <div style={{ height: 8, borderRadius: 4, background: t.dark ? '#1e2f4a' : '#e2e8f0' }}>
+                  <div style={{ height: '100%', borderRadius: 4, width: `${Math.min(insights.budget_analysis.budget_utilization, 100)}%`, background: insights.budget_analysis.budget_utilization > 100 ? '#ef4444' : 'linear-gradient(90deg,#3b82f6,#10b981)', transition: 'width 0.8s ease' }} />
                 </div>
               </div>
-              
               {insights.budget_analysis.overspend > 0 && (
-                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-800 font-medium">
-                    ⚠️ You overspent by ₹{insights.budget_analysis.overspend?.toLocaleString()}
-                  </p>
+                <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13, color: '#ef4444' }}>
+                  ⚠️ Overspent by ₹{insights.budget_analysis.overspend?.toLocaleString()}
                 </div>
               )}
-            </div>
+            </Card>
           )}
 
           {/* Destination Breakdown */}
           {insights.destination_breakdown && Object.keys(insights.destination_breakdown).length > 0 && (
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-              <div className="flex items-center mb-6">
-                <Globe className="h-6 w-6 text-primary-600 mr-2" />
-                <h2 className="text-xl font-bold text-gray-900">Destination Breakdown</h2>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Object.entries(insights.destination_breakdown).map(([destination, count]) => (
-                  <div key={destination} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-gray-700">{destination}</span>
-                    <span className="font-bold text-primary-600">{count} trips</span>
+            <Card>
+              <SectionTitle>Destinations Visited</SectionTitle>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
+                {Object.entries(insights.destination_breakdown).map(([dest, count]) => (
+                  <div key={dest} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 10, background: t.dark ? 'rgba(255,255,255,0.03)' : '#f8fafc' }}>
+                    <span style={{ fontSize: 13, color: t.textSecondary }}>📍 {dest}</span>
+                    <Badge color="#3b82f6">{count} trip{count > 1 ? 's' : ''}</Badge>
                   </div>
                 ))}
               </div>
-            </div>
+            </Card>
           )}
+
         </div>
       )}
     </div>
   )
 }
-
-export default Insights
