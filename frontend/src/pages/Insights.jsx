@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/axios'
-import { useTheme } from './ThemeContext'
-import { Card, Spinner, EmptyState, Badge, SectionTitle } from './UI'
+import { useTheme } from '../design/Themecontext'
+import { Card, Spinner, EmptyState, Badge, SectionTitle } from '../design/UI'
 
 const PERSONALITY_META = {
   'Budget Explorer': { emoji: '🎒', color: '#10b981', desc: "You love exploring the world while being smart with your money. Budget travel doesn't mean compromising on experiences!" },
