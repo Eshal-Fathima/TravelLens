@@ -1,154 +1,122 @@
+# -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models.expense import Expense
+from models.place import Place
 from models.trip import Trip
 from extensions import db
 
-expenses_bp = Blueprint('expenses', __name__)
+places_bp = Blueprint('places', __name__)
 
-@expenses_bp.route('/expenses', methods=['POST'])
+@places_bp.route('/places', methods=['POST'])
 @jwt_required()
-def create_expense():
+def create_place():
     try:
         current_user_id = int(get_jwt_identity())
         data = request.get_json()
 
-        required_fields = ['trip_id', 'category', 'amount']
+        required_fields = ['trip_id', 'place_name', 'category']
         if not data or not all(k in data for k in required_fields):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        valid_categories = ['Transport', 'Food', 'Stay', 'Activities', 'Shopping', 'Other']
+        valid_categories = ['Beach', 'Fort', 'Museum', 'Temple', 'Mountain', 'Park', 'Restaurant', 'Shopping', 'Entertainment', 'Historical', 'Other']
         if data['category'] not in valid_categories:
             return jsonify({'error': 'Invalid category'}), 400
 
         trip_id = int(data['trip_id'])
-        amount  = float(data['amount'])
+        rating  = float(data['rating']) if data.get('rating') else None
 
-        if amount <= 0:
-            return jsonify({'error': 'Amount must be positive'}), 400
+        if rating and (rating < 1 or rating > 5):
+            return jsonify({'error': 'Rating must be between 1 and 5'}), 400
 
         trip = Trip.query.filter_by(id=trip_id, user_id=current_user_id).first()
         if not trip:
             return jsonify({'error': 'Trip not found or access denied'}), 404
 
-        expense = Expense(
+        place = Place(
             trip_id=trip_id,
+            place_name=data['place_name'],
             category=data['category'],
-            amount=amount,
-            description=data.get('description')
+            rating=rating,
+            notes=data.get('notes')
         )
-        db.session.add(expense)
+        db.session.add(place)
         db.session.commit()
-        return jsonify({'message': 'Expense created successfully', 'expense': expense.to_dict()}), 201
+        return jsonify({'message': 'Place created successfully', 'place': place.to_dict()}), 201
 
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@expenses_bp.route('/expenses', methods=['GET'])
-@jwt_required()
-def get_all_expenses():
-    try:
-        current_user_id = int(get_jwt_identity())
-        from models.trip import Trip
-        trip_ids = [t.id for t in Trip.query.filter_by(user_id=current_user_id).all()]
-        expenses = Expense.query.filter(Expense.trip_id.in_(trip_ids)).order_by(Expense.created_at.desc()).all()
-        return jsonify({'expenses': [e.to_dict() for e in expenses]}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
-@expenses_bp.route('/expenses/<int:trip_id>', methods=['GET'])
+@places_bp.route('/places/<int:trip_id>', methods=['GET'])
 @jwt_required()
-def get_expenses(trip_id):
+def get_places(trip_id):
     try:
         current_user_id = int(get_jwt_identity())
         trip = Trip.query.filter_by(id=trip_id, user_id=current_user_id).first()
         if not trip:
             return jsonify({'error': 'Trip not found or access denied'}), 404
 
-        expenses = Expense.query.filter_by(trip_id=trip_id).order_by(Expense.created_at.desc()).all()
-        return jsonify({'expenses': [expense.to_dict() for expense in expenses]}), 200
+        places = Place.query.filter_by(trip_id=trip_id).order_by(Place.created_at.desc()).all()
+        return jsonify({'places': [place.to_dict() for place in places]}), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@expenses_bp.route('/expenses/<int:trip_id>/summary', methods=['GET'])
+
+@places_bp.route('/places/<int:place_id>', methods=['PUT'])
 @jwt_required()
-def get_expense_summary(trip_id):
+def update_place(place_id):
     try:
         current_user_id = int(get_jwt_identity())
-        trip = Trip.query.filter_by(id=trip_id, user_id=current_user_id).first()
-        if not trip:
-            return jsonify({'error': 'Trip not found or access denied'}), 404
+        place = Place.query.get(place_id)
+        if not place:
+            return jsonify({'error': 'Place not found'}), 404
 
-        expenses = Expense.query.filter_by(trip_id=trip_id).all()
-        category_totals = {}
-        total_amount = 0
-        for expense in expenses:
-            cat = expense.category
-            amt = float(expense.amount)
-            total_amount += amt
-            category_totals[cat] = category_totals.get(cat, 0) + amt
-
-        return jsonify({
-            'total_expenses': total_amount,
-            'category_breakdown': category_totals,
-            'expense_count': len(expenses)
-        }), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@expenses_bp.route('/expenses/<int:expense_id>', methods=['PUT'])
-@jwt_required()
-def update_expense(expense_id):
-    try:
-        current_user_id = int(get_jwt_identity())
-        expense = Expense.query.get(expense_id)
-        if not expense:
-            return jsonify({'error': 'Expense not found'}), 404
-
-        trip = Trip.query.filter_by(id=expense.trip_id, user_id=current_user_id).first()
+        trip = Trip.query.filter_by(id=place.trip_id, user_id=current_user_id).first()
         if not trip:
             return jsonify({'error': 'Access denied'}), 403
 
         data = request.get_json()
+        if 'place_name' in data:
+            place.place_name = data['place_name']
         if 'category' in data:
-            valid_categories = ['Transport', 'Food', 'Stay', 'Activities', 'Shopping', 'Other']
+            valid_categories = ['Beach', 'Fort', 'Museum', 'Temple', 'Mountain', 'Park', 'Restaurant', 'Shopping', 'Entertainment', 'Historical', 'Other']
             if data['category'] not in valid_categories:
                 return jsonify({'error': 'Invalid category'}), 400
-            expense.category = data['category']
-        if 'amount' in data:
-            amount = float(data['amount'])
-            if amount <= 0:
-                return jsonify({'error': 'Amount must be positive'}), 400
-            expense.amount = amount
-        if 'description' in data:
-            expense.description = data['description']
+            place.category = data['category']
+        if 'rating' in data and data['rating'] is not None:
+            rating = float(data['rating'])
+            if rating < 1 or rating > 5:
+                return jsonify({'error': 'Rating must be between 1 and 5'}), 400
+            place.rating = rating
+        if 'notes' in data:
+            place.notes = data['notes']
 
         db.session.commit()
-        return jsonify({'message': 'Expense updated successfully', 'expense': expense.to_dict()}), 200
+        return jsonify({'message': 'Place updated successfully', 'place': place.to_dict()}), 200
 
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@expenses_bp.route('/expenses/<int:expense_id>', methods=['DELETE'])
+
+@places_bp.route('/places/<int:place_id>', methods=['DELETE'])
 @jwt_required()
-def delete_expense(expense_id):
+def delete_place(place_id):
     try:
         current_user_id = int(get_jwt_identity())
-        expense = Expense.query.get(expense_id)
-        if not expense:
-            return jsonify({'error': 'Expense not found'}), 404
+        place = Place.query.get(place_id)
+        if not place:
+            return jsonify({'error': 'Place not found'}), 404
 
-        trip = Trip.query.filter_by(id=expense.trip_id, user_id=current_user_id).first()
+        trip = Trip.query.filter_by(id=place.trip_id, user_id=current_user_id).first()
         if not trip:
             return jsonify({'error': 'Access denied'}), 403
 
-        db.session.delete(expense)
+        db.session.delete(place)
         db.session.commit()
-        return jsonify({'message': 'Expense deleted successfully'}), 200
+        return jsonify({'message': 'Place deleted successfully'}), 200
 
     except Exception as e:
         db.session.rollback()
