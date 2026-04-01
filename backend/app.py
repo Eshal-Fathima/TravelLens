@@ -23,7 +23,7 @@ def create_app():
     db.init_app(app)
     jwt.init_app(app)
     migrate.init_app(app, db)
-    CORS(app)
+    CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
     
     # Import models to ensure they're registered with SQLAlchemy
     from models import User, Trip, Place, Hotel, Expense
@@ -36,7 +36,8 @@ def create_app():
     from routes.expenses import expenses_bp
     from routes.insights import insights_bp
     from routes.recommendations import recommendations_bp
-    
+    from routes.analytics import analytics_bp
+
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(trips_bp, url_prefix='/api')
     app.register_blueprint(places_bp, url_prefix='/api')
@@ -44,6 +45,7 @@ def create_app():
     app.register_blueprint(expenses_bp, url_prefix='/api')
     app.register_blueprint(insights_bp, url_prefix='/api')
     app.register_blueprint(recommendations_bp, url_prefix='/api')
+    app.register_blueprint(analytics_bp, url_prefix='/api')
     
     # Create database tables if they don't exist
     with app.app_context():

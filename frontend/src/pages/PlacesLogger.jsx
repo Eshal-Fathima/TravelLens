@@ -64,7 +64,13 @@ export default function PlacesLogger() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const data = { ...form, rating: form.rating ? parseFloat(form.rating) : null }
+      const data = {
+        trip_id: parseInt(form.trip_id),
+        place_name: form.place_name.trim(),
+        category: form.category,
+        rating: form.rating ? parseFloat(form.rating) : null,
+        notes: form.notes,
+      }
       if (editing) await api.put(`/api/places/${editing.id}`, data)
       else await api.post('/api/places', data)
       fetchPlaces(); closeForm()

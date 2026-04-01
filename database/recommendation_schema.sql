@@ -87,3 +87,8 @@ UPDATE places SET master_place_id = 5 WHERE place_name = 'Alleppey Backwaters';
 INSERT INTO embedding_sync (ref_id, ref_type, last_generated) VALUES 
 (1, 'place', NULL), (2, 'place', NULL), (3, 'place', NULL), (4, 'place', NULL), (5, 'place', NULL),
 (1, 'user', NULL), (2, 'user', NULL);
+
+ALTER TABLE trips MODIFY COLUMN travel_type VARCHAR(50) NOT NULL DEFAULT 'Solo';
+
+ALTER TABLE hotels DROP COLUMN total_cost;
+ALTER TABLE hotels ADD COLUMN total_cost DECIMAL(10,2) NOT NULL DEFAULT 0;

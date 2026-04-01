@@ -42,7 +42,16 @@ export default function HotelLogger() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const data = { ...form, cost_per_night: parseFloat(form.cost_per_night), nights: parseInt(form.nights) }
+      const cost = parseFloat(form.cost_per_night)
+      const nights = parseInt(form.nights)
+      if (isNaN(cost) || cost <= 0) { alert('Please enter a valid cost per night.'); return }
+      if (isNaN(nights) || nights <= 0) { alert('Please enter a valid number of nights.'); return }
+      const data = {
+        trip_id: parseInt(form.trip_id),  // must be int for Python comparison
+        hotel_name: form.hotel_name.trim(),
+        cost_per_night: cost,
+        nights: nights,
+      }
       if (editing) await api.put(`/api/hotels/${editing.id}`, data)
       else await api.post('/api/hotels', data)
       fetchHotels(); closeForm()
