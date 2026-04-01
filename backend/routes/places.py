@@ -4,9 +4,14 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from models.place import Place
 from models.trip import Trip
 from extensions import db
+from recommendation.interest_builder import build_user_interest_profile
 
+# ✅ DEFINE BLUEPRINT (THIS WAS MISSING)
 places_bp = Blueprint('places', __name__)
 
+# ===========================
+# CREATE PLACE (MAIN LOGIC)
+# ===========================
 @places_bp.route('/places', methods=['POST'])
 @jwt_required()
 def create_place():
@@ -80,8 +85,8 @@ def update_place(place_id):
         data = request.get_json()
         if 'place_name' in data:
             place.place_name = data['place_name']
+
         if 'category' in data:
-            valid_categories = ['Beach', 'Fort', 'Museum', 'Temple', 'Mountain', 'Park', 'Restaurant', 'Shopping', 'Entertainment', 'Historical', 'Other']
             if data['category'] not in valid_categories:
                 return jsonify({'error': 'Invalid category'}), 400
             place.category = data['category']
