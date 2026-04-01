@@ -5,8 +5,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+
 def create_app():
     app = Flask(__name__)
+   
     
     # Configuration
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -47,6 +50,21 @@ def create_app():
         try:
             db.create_all()
             print("✅ Database tables created successfully!")
+            
+            # Initialize recommendation system after database is ready
+            print("🤖 Initializing recommendation system...")
+            from recommendation.init_recommendations import initialize_recommendation_system, warm_up_recommendation_system
+            
+            if initialize_recommendation_system():
+                print("✅ Recommendation system initialized successfully!")
+                
+                # Warm up the system
+                if warm_up_recommendation_system():
+                    print("✅ Recommendation system warm-up completed!")
+                else:
+                    print("⚠️ Recommendation system warm-up failed, but system is ready")
+            else:
+                print("❌ Failed to initialize recommendation system")
             
             # Add sample data if database is empty
             from models.user import User
@@ -97,6 +115,10 @@ def create_app():
             print("1. Make sure MySQL server is running")
             print("2. Check DATABASE_URL in .env file")
             print("3. Verify MySQL user credentials")
+
+   
+
+        
     
     return app
 

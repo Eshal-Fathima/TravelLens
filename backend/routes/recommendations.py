@@ -6,6 +6,15 @@ from models.place import Place
 from models.expense import Expense
 from extensions import db
 import random
+import logging
+
+# Import recommendation system modules
+from recommendation.interest_builder import build_user_interest_profile
+from recommendation.retriever import retrieve_candidates_with_fallback
+from recommendation.ranker import rank_places
+from recommendation.llm_explainer import generate_explanation
+
+logger = logging.getLogger(__name__)
 
 recommendations_bp = Blueprint('recommendations', __name__)
 
@@ -70,12 +79,126 @@ BUDGET_TIPS = [
 def get_recommendations(user_id):
     """Get personalized recommendations for a user"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Only allow users to see their own recommendations
         if current_user_id != user_id:
             return jsonify({'error': 'Access denied'}), 403
         
+        # Check if we want the new recommendation system or legacy
+        use_new_system = request.args.get('new_system', 'true').lower() == 'true'
+        
+        if use_new_system:
+            return get_new_recommendations(user_id)
+        else:
+            return get_legacy_recommendations(user_id)
+            
+    except Exception as e:
+        logger.error(f"Error getting recommendations for user {user_id}: {str(e)}")
+        return jsonify({'error': 'Recommendation service temporarily unavailable'}), 500
+
+@recommendations_bp.route('/recommendations/status', methods=['GET'])
+def get_recommendation_status():
+    """Get the status of the recommendation system"""
+    try:
+        from recommendation.init_recommendations import get_recommendation_system_status
+        status = get_recommendation_system_status()
+        return jsonify(status), 200
+    except Exception as e:
+        logger.error(f"Error getting recommendation status: {str(e)}")
+        return jsonify({'error': 'Status unavailable', 'initialized': False}), 500
+
+@recommendations_bp.route('/recommendations/refresh', methods=['POST'])
+@jwt_required()
+def refresh_recommendation_system():
+    """Refresh the recommendation system (rebuild index)"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # For now, only allow admin users or specific users to refresh
+        # In production, you'd check for admin role
+        if current_user_id != 1:  # Assuming user ID 1 is admin
+            return jsonify({'error': 'Access denied'}), 403
+        
+        from recommendation.init_recommendations import initialize_recommendation_system
+        
+        if initialize_recommendation_system():
+            return jsonify({'message': 'Recommendation system refreshed successfully'}), 200
+        else:
+            return jsonify({'error': 'Failed to refresh recommendation system'}), 500
+            
+    except Exception as e:
+        logger.error(f"Error refreshing recommendation system: {str(e)}")
+        return jsonify({'error': 'Refresh failed'}), 500
+
+def get_new_recommendations(user_id):
+    """Get recommendations using the new retrieval-based system"""
+    try:
+        logger.info(f"Generating new recommendations for user {user_id}")
+        
+        # Step 1: Build user interest profile
+        profile_result = build_user_interest_profile(user_id)
+        
+        if not profile_result.get('success', False):
+            logger.warning(f"Failed to build profile for user {user_id}: {profile_result.get('error', 'Unknown error')}")
+        
+        # Step 2: Retrieve candidates
+        candidates = retrieve_candidates_with_fallback(user_id, k=20)
+        
+        if not candidates:
+            logger.info(f"No candidates found for user {user_id}")
+            return jsonify({
+                'recommendations': [],
+                'message': 'No recommendations available at the moment'
+            }), 200
+        
+        # Step 3: Rank places
+        ranked_places = rank_places(user_id, candidates, top_k=5)
+        
+        if not ranked_places:
+            logger.info(f"No ranked places for user {user_id}")
+            return jsonify({
+                'recommendations': [],
+                'message': 'No recommendations available at the moment'
+            }), 200
+        
+        # Step 4: Generate explanations
+        recommendations = []
+        for place_data in ranked_places:
+            place_name = place_data.get('place_name', 'Unknown Place')
+            score = place_data.get('final_score', 0.0)
+            
+            # Generate explanation
+            explanation = generate_explanation(user_id, place_name)
+            
+            recommendations.append({
+                'place': place_name,
+                'place_id': place_data.get('place_id'),
+                'city': place_data.get('city', 'Unknown'),
+                'category': place_data.get('category', 'Unknown'),
+                'score': round(score, 3),
+                'reason': explanation,
+                'tags': place_data.get('tags', []),
+                'vector_similarity': place_data.get('vector_similarity', 0.0),
+                'tag_overlap': place_data.get('tag_overlap', 0.0),
+                'novelty': place_data.get('novelty', 0.0)
+            })
+        
+        logger.info(f"Generated {len(recommendations)} recommendations for user {user_id}")
+        
+        return jsonify({
+            'recommendations': recommendations,
+            'system': 'retrieval_based',
+            'profile_updated': profile_result.get('success', False)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error in new recommendation system for user {user_id}: {str(e)}")
+        return jsonify({'error': 'Recommendation system temporarily unavailable'}), 500
+
+def get_legacy_recommendations(user_id):
+    """Get recommendations using the legacy system"""
+    try:
         # Get user data
         trips = Trip.query.filter_by(user_id=user_id).all()
         trip_ids = [trip.id for trip in trips]
@@ -87,10 +210,12 @@ def get_recommendations(user_id):
         recommendations = generate_recommendations(trips, places, expenses)
         
         return jsonify({
-            'recommendations': recommendations
+            'recommendations': recommendations,
+            'system': 'legacy'
         }), 200
         
     except Exception as e:
+        logger.error(f"Error in legacy recommendation system for user {user_id}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 def generate_recommendations(trips, places, expenses):
