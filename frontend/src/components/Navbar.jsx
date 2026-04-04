@@ -40,8 +40,9 @@ const NAV_LINKS = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/trip-logger', label: 'Trips' },
   { to: '/expense-tracker', label: 'Expenses' },
-  { to: '/insights', label: 'Insights' },
+  { to: '/places-logger', label: 'Places' },
   { to: '/hotel-logger', label: 'Hotels' },
+  { to: '/insights', label: 'Insights' },
   { to: '/recommendations', label: 'Recommendations' },
 ]
 
@@ -133,7 +134,7 @@ const Navbar = ({ user, isDark, onToggleTheme, onLogout }) => {
               onClick={onToggleTheme}
               className="tl-icon-btn transition-all active:scale-95"
               style={{
-                color: t.textPrimary, // Use primary text for better visibility
+                color: t.textPrimary,
                 gap: 8,
                 padding: '8px 16px',
                 borderRadius: 999,
@@ -141,21 +142,18 @@ const Navbar = ({ user, isDark, onToggleTheme, onLogout }) => {
                 background: t.inputBg,
                 fontSize: 12,
                 fontFamily: 'Manrope',
-                fontWeight: 700, // Slightly bolder for that "TravelLens" look
+                fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
                 cursor: 'pointer',
                 letterSpacing: '0.05em',
-                textTransform: 'uppercase' // Matches the high-fidelity dashboard style
+                textTransform: 'uppercase'
               }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                {/* If it's currently dark, show the light icon to switch */}
                 {isDark ? 'light_mode' : 'dark_mode'}
               </span>
-
               <span>
-                {/* If it's currently dark, the button should offer "Light" mode */}
                 {isDark ? 'Light' : 'Dark'}
               </span>
             </button>

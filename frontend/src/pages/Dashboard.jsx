@@ -63,19 +63,21 @@ function StatTile({ icon, label, value, trend, trendUp, t }) {
 }
 
 // ── TripCard with Gemini AI background images ──────────────────────────────
+// ── Drop-in replacement for TripCard inside Dashboard.jsx ──────────────────
+// The bug: when bgImage is null, setting backgroundImage:"none" AND background:gradient
+// on the same element causes the shorthand `background` to override backgroundImage.
+// Fix: use a single `background` property for both cases, never mix the two.
+
 function TripCard({ trip, gradient }) {
   const [bgImage, setBgImage] = useState(null)
   const [imgLoading, setImgLoading] = useState(true)
 
   useEffect(() => {
-    console.log("TripCard useEffect running for:", trip?.destination) // 👈 DEBUG
-
     if (!trip?.destination) {
       setImgLoading(false)
       return
     }
 
-    // Use sessionStorage to cache — avoids calling API on every re-render
     const cacheKey = `trip-img-${trip.id}`
     const cached = sessionStorage.getItem(cacheKey)
     if (cached) {
@@ -84,32 +86,28 @@ function TripCard({ trip, gradient }) {
       return
     }
 
-    // 👇 ADD THIS LINE
-    console.log("Calling API...")
-
     api.post('/api/gemini/trip-image', {
       destination: trip.destination,
       travel_type: trip.travel_type || 'leisure'
     })
       .then(res => {
-        console.log("GEMINI RESPONSE:", res.data)   // 👈 ADD
-
         const url = res.data?.imageUrl
-
         if (url) {
-          console.log("IMAGE URL:", url)   // 👈 ADD
-
           sessionStorage.setItem(cacheKey, url)
-          setBgImage(url + "&sig=" + trip.id)
+          setBgImage(url)
         }
       })
       .catch(() => {
-        // silently fall back to gradient — no console spam
+        // silently fall back to gradient
       })
       .finally(() => setImgLoading(false))
   }, [trip?.id, trip?.destination])
 
-  console.log("FINAL bgImage:", bgImage)
+  // ── KEY FIX: use one unified `background` shorthand, never mix
+  // `background` + `backgroundImage` on the same element ──
+  const cardBackground = bgImage
+    ? `linear-gradient(to top, rgba(0,0,0,0.65), rgba(0,0,0,0.15)), url(${bgImage}) center/cover no-repeat`
+    : gradient
 
   return (
     <div style={{
@@ -117,28 +115,19 @@ function TripCard({ trip, gradient }) {
       overflow: 'hidden',
       position: 'relative',
       height: 290,
-
-      // ✅ FIXED BACKGROUND LOGIC
-      backgroundImage: bgImage
-        ? `linear-gradient(to top, rgba(0,0,0,0.6), rgba(0,0,0,0.2)), url(${bgImage})`
-        : 'none',
-      background: bgImage ? 'none' : gradient,
-
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
-
+      background: cardBackground,   // ← single property handles both states
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'flex-end',
-      transition: 'background-image 0.4s ease',
+      transition: 'background 0.4s ease',
     }}>
+      {/* Decorative orb — only shown on gradient fallback */}
+      {!bgImage && (
+        <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
+      )}
 
-      {/* Decorative orb */}
-      <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
-
-      {/* Bottom gradient so text is always readable over photos */}
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top,rgba(0,0,0,0.80) 0%,rgba(0,0,0,0.15) 55%,transparent 100%)' }} />
+      {/* Bottom gradient so text stays readable over photos */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.80) 0%, rgba(0,0,0,0.15) 55%, transparent 100%)' }} />
 
       <div style={{ position: 'relative', zIndex: 1, padding: '20px' }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
