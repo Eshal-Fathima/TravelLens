@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/axios'
 import { useTheme } from '../design/Themecontext'
 import { Spinner } from '../design/UI'
-import Navbar from '../components/Navbar'
 import {
   BarChart, Bar, PieChart as RePieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -31,8 +30,8 @@ const themes = {
     primary: '#003461', primaryFaded: '#004b8718', accent: '#1b6d24', accentFaded: '#1b6d2418',
   },
   dark: {
-    bg: '#111125', surface: '#1e1e32', card: '#1e1e32', border: 'rgba(66,71,80,0.35)',
-    textPrimary: '#e2e0fc', textSecond: '#c2c6d1', textMuted: '#8c919b',
+    bg: '#0a0a0a', surface: '#141414', card: '#1a1a1a', border: 'rgba(255,255,255,0.08)',
+    textPrimary: '#f0f0f0', textSecond: '#b0b0b0', textMuted: '#666666',
     primary: '#a3c9ff', primaryFaded: '#a3c9ff14', accent: '#4ae183', accentFaded: '#4ae18314',
   }
 }
@@ -63,11 +62,84 @@ function StatTile({ icon, label, value, trend, trendUp, t }) {
   )
 }
 
+// ── TripCard with Gemini AI background images ──────────────────────────────
 function TripCard({ trip, gradient }) {
+  const [bgImage, setBgImage] = useState(null)
+  const [imgLoading, setImgLoading] = useState(true)
+
+  useEffect(() => {
+    console.log("TripCard useEffect running for:", trip?.destination) // 👈 DEBUG
+
+    if (!trip?.destination) {
+      setImgLoading(false)
+      return
+    }
+
+    // Use sessionStorage to cache — avoids calling API on every re-render
+    const cacheKey = `trip-img-${trip.id}`
+    const cached = sessionStorage.getItem(cacheKey)
+    if (cached) {
+      setBgImage(cached)
+      setImgLoading(false)
+      return
+    }
+
+    // 👇 ADD THIS LINE
+    console.log("Calling API...")
+
+    api.post('/api/gemini/trip-image', {
+      destination: trip.destination,
+      travel_type: trip.travel_type || 'leisure'
+    })
+      .then(res => {
+        console.log("GEMINI RESPONSE:", res.data)   // 👈 ADD
+
+        const url = res.data?.imageUrl
+
+        if (url) {
+          console.log("IMAGE URL:", url)   // 👈 ADD
+
+          sessionStorage.setItem(cacheKey, url)
+          setBgImage(url + "&sig=" + trip.id)
+        }
+      })
+      .catch(() => {
+        // silently fall back to gradient — no console spam
+      })
+      .finally(() => setImgLoading(false))
+  }, [trip?.id, trip?.destination])
+
+  console.log("FINAL bgImage:", bgImage)
+
   return (
-    <div style={{ borderRadius: 20, overflow: 'hidden', position: 'relative', height: 290, background: gradient, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+    <div style={{
+      borderRadius: 20,
+      overflow: 'hidden',
+      position: 'relative',
+      height: 290,
+
+      // ✅ FIXED BACKGROUND LOGIC
+      backgroundImage: bgImage
+        ? `linear-gradient(to top, rgba(0,0,0,0.6), rgba(0,0,0,0.2)), url(${bgImage})`
+        : 'none',
+      background: bgImage ? 'none' : gradient,
+
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'flex-end',
+      transition: 'background-image 0.4s ease',
+    }}>
+
+      {/* Decorative orb */}
       <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top,rgba(0,0,0,0.72) 0%,transparent 55%)' }} />
+
+      {/* Bottom gradient so text is always readable over photos */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top,rgba(0,0,0,0.80) 0%,rgba(0,0,0,0.15) 55%,transparent 100%)' }} />
+
       <div style={{ position: 'relative', zIndex: 1, padding: '20px' }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           <span style={{ background: 'rgba(255,255,255,0.13)', backdropFilter: 'blur(8px)', padding: '3px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700, color: 'white', textTransform: 'uppercase', letterSpacing: '1.5px', border: '1px solid rgba(255,255,255,0.18)', fontFamily: 'Manrope' }}>
@@ -78,7 +150,7 @@ function TripCard({ trip, gradient }) {
           </span>
         </div>
         <h3 style={{ fontSize: 20, fontWeight: 800, color: 'white', margin: '0 0 4px', fontFamily: 'Manrope' }}>{trip.trip_name}</h3>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Manrope' }}>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Manrope' }}>
           <Icon name="location_on" size={13} style={{ color: 'rgba(255,255,255,0.55)' }} />
           {trip.destination} · ₹{trip.budget?.toLocaleString()}
         </p>
@@ -89,11 +161,14 @@ function TripCard({ trip, gradient }) {
     </div>
   )
 }
+// ──────────────────────────────────────────────────────────────────────────
 
-export default function Dashboard() {
+export default function Dashboard({ isDark: isDarkProp, onToggleTheme }) {
   const { user, loading: authLoading } = useAuth()
   const { dark } = useTheme()
-  const [isDark, setIsDark] = useState(dark ?? true)
+  const [isDark, setIsDark] = useState(isDarkProp ?? dark ?? true)
+
+  useEffect(() => { if (isDarkProp !== undefined) setIsDark(isDarkProp) }, [isDarkProp])
   const t = themes[isDark ? 'dark' : 'light']
   const [loading, setLoading] = useState(true)
   const [insights, setInsights] = useState(null)
@@ -170,17 +245,22 @@ export default function Dashboard() {
   const tooltipStyle = { background: t.card, border: `1px solid ${t.border}`, borderRadius: 10, color: t.textPrimary, fontSize: 12, fontFamily: 'Manrope' }
 
   return (
-    <div style={{ minHeight: '100vh', background: t.bg, fontFamily: 'Manrope,sans-serif', transition: 'background 0.3s' }}>
+    <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=Lora:ital,wght@1,700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
         .material-symbols-outlined { font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24; display:inline-flex;align-items:center;line-height:1; }
+        html, body, #root { margin:0!important; padding:0!important; background:${t.bg}!important; box-shadow:none!important; border:none!important; }
         *{box-sizing:border-box;}
         ::-webkit-scrollbar{width:4px;}
         ::-webkit-scrollbar-thumb{background:${t.border};border-radius:4px;}
         .rec-hover:hover{transform:translateX(3px);}
         .act-btn:hover{background:${t.primary}!important;color:${isDark ? '#00315c' : 'white'}!important;}
         .act-btn:hover span{color:${isDark ? '#00315c' : 'white'}!important;}
+        @keyframes tl-shimmer {
+          0%,100% { opacity:1; }
+          50%      { opacity:0.5; }
+        }
         @media(min-width:900px){
           .g12{grid-template-columns:repeat(12,1fr)!important;}
           .c8{grid-column:span 8/span 8!important;}
@@ -194,10 +274,7 @@ export default function Dashboard() {
         @media(max-width:899px){.mob-nav{display:flex!important;}}
       `}</style>
 
-      {/* TOP NAVBAR */}
-      <Navbar user={user} isDark={isDark} onToggleTheme={() => setIsDark(p => !p)} />
-
-      <main style={{ paddingTop: 64 }}>
+      <div style={{ minHeight: '100vh', background: t.bg, fontFamily: 'Manrope,sans-serif', transition: 'background 0.3s' }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '36px 28px 100px' }}>
 
           {/* Header */}
@@ -445,10 +522,10 @@ export default function Dashboard() {
 
           </div>
         </div>
-      </main>
+      </div>
 
       {/* Mobile Bottom Nav */}
-      <nav className="mob-nav" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: isDark ? 'rgba(17,17,37,0.92)' : 'rgba(253,250,231,0.92)', backdropFilter: 'blur(20px)', borderTop: `1px solid ${t.border}`, zIndex: 50, justifyContent: 'space-around', alignItems: 'center', padding: '10px 16px' }}>
+      <nav className="mob-nav" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: isDark ? 'rgba(10,10,10,0.95)' : 'rgba(253,250,231,0.92)', backdropFilter: 'blur(20px)', borderTop: `1px solid ${t.border}`, zIndex: 50, justifyContent: 'space-around', alignItems: 'center', padding: '10px 16px' }}>
         {[
           { to: '/dashboard', icon: 'dashboard', label: 'Home', active: true },
           { to: '/trip-logger', icon: 'map', label: 'Trips', active: false },
@@ -464,6 +541,6 @@ export default function Dashboard() {
           <Icon name="add" size={22} style={{ color: isDark ? '#002204' : 'white' }} />
         </Link>
       </nav>
-    </div>
+    </>
   )
 }

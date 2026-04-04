@@ -20,17 +20,17 @@ const themes = {
     hoverLink: '#004b87',
   },
   dark: {
-    bg: 'rgba(17,17,37,0.82)',
-    border: 'rgba(66,71,80,0.35)',
-    textPrimary: '#e2e0fc',
-    textMuted: '#8c919b',
-    textSecond: '#c2c6d1',
+    bg: 'rgba(10,10,10,0.88)',
+    border: 'rgba(255,255,255,0.08)',
+    textPrimary: '#f0f0f0',
+    textMuted: '#666666',
+    textSecond: '#b0b0b0',
     primary: '#a3c9ff',
     accent: '#4ae183',
     accentFaded: '#4ae18318',
-    inputBg: '#1e1e32',
-    cardBg: '#1e1e32',
-    dropBg: '#0c0c1f',
+    inputBg: '#1a1a1a',
+    cardBg: '#1a1a1a',
+    dropBg: '#111111',
     activeLink: '#a3c9ff',
     hoverLink: '#c2d8ff',
   }
@@ -41,10 +41,11 @@ const NAV_LINKS = [
   { to: '/trip-logger', label: 'Trips' },
   { to: '/expense-tracker', label: 'Expenses' },
   { to: '/insights', label: 'Insights' },
-  { to: '/analytics', label: 'Analytics' },
+  { to: '/hotel-logger', label: 'Hotels' },
+  { to: '/recommendations', label: 'Recommendations' },
 ]
 
-const Navbar = ({ user, isDark, onToggleTheme }) => {
+const Navbar = ({ user, isDark, onToggleTheme, onLogout }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const { logout } = useAuth()
@@ -55,6 +56,7 @@ const Navbar = ({ user, isDark, onToggleTheme }) => {
   const t = themes[isDark ? 'dark' : 'light']
 
   const handleLogout = () => {
+    if (onLogout) { onLogout(); return }
     logout()
     navigate('/login')
   }
@@ -109,24 +111,8 @@ const Navbar = ({ user, isDark, onToggleTheme }) => {
             </div>
           </Link>
 
-          {/* ── Search (desktop) ── */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: t.inputBg, border: `1px solid ${t.border}`,
-            borderRadius: 999, padding: '8px 16px', flex: '0 1 220px',
-          }} className="search-wrap">
-            <span className="material-symbols-outlined" style={{ color: t.textMuted, fontSize: 17 }}>search</span>
-            <input
-              placeholder="Search trips..."
-              style={{
-                background: 'transparent', border: 'none', outline: 'none',
-                fontSize: 13, color: t.textPrimary, fontFamily: 'Manrope', width: '100%',
-              }}
-            />
-          </div>
-
           {/* ── Desktop Nav Links ── */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 28 }} className="desktop-links">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }} className="desktop-links">
             {NAV_LINKS.map(link => (
               <Link
                 key={link.to}
@@ -145,11 +131,33 @@ const Navbar = ({ user, isDark, onToggleTheme }) => {
             {/* Theme Toggle */}
             <button
               onClick={onToggleTheme}
-              className="tl-icon-btn"
-              style={{ color: t.textSecond, gap: 6, padding: '7px 12px', borderRadius: 999, border: `1px solid ${t.border}`, background: t.inputBg, fontSize: 13, fontFamily: 'Manrope', fontWeight: 600, display: 'flex', alignItems: 'center' }}
+              className="tl-icon-btn transition-all active:scale-95"
+              style={{
+                color: t.textPrimary, // Use primary text for better visibility
+                gap: 8,
+                padding: '8px 16px',
+                borderRadius: 999,
+                border: `1px solid ${t.border}`,
+                background: t.inputBg,
+                fontSize: 12,
+                fontFamily: 'Manrope',
+                fontWeight: 700, // Slightly bolder for that "TravelLens" look
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase' // Matches the high-fidelity dashboard style
+              }}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{isDark ? 'light_mode' : 'dark_mode'}</span>
-              <span style={{ fontSize: 12 }}>{isDark ? 'Light' : 'Dark'}</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                {/* If it's currently dark, show the light icon to switch */}
+                {isDark ? 'light_mode' : 'dark_mode'}
+              </span>
+
+              <span>
+                {/* If it's currently dark, the button should offer "Light" mode */}
+                {isDark ? 'Light' : 'Dark'}
+              </span>
             </button>
 
             {/* Notifications */}
@@ -274,7 +282,6 @@ const Navbar = ({ user, isDark, onToggleTheme }) => {
       <style>{`
         @media (max-width: 900px) {
           .desktop-links { display: none !important; }
-          .search-wrap   { display: none !important; }
           .log-trip-btn  { display: none !important; }
           .user-text     { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
