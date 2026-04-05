@@ -150,20 +150,7 @@ export default function Recommendations() {
 
         <div style={{ position: 'relative', zIndex: 1, maxWidth: 1080, margin: '0 auto', padding: '0 24px 100px' }}>
 
-          {/* ── Nav ── */}
-          <nav style={{
-            position: 'sticky', top: 0, zIndex: 50,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            height: 68,
-            background: t.navBg, backdropFilter: 'blur(18px)',
-            borderBottom: `1px solid ${t.border}`,
-            margin: '0 -24px', padding: '0 24px',
-          }}>
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase', color: t.accent }}>
-              Travel Journal
-            </div>
 
-          </nav>
 
           {/* ── Header ── */}
           <header style={{ margin: '48px 0 40px', animation: 'rec-fade 0.45s ease both' }}>
@@ -266,12 +253,10 @@ export default function Recommendations() {
                     {recs.destinations[1] && (
                       <div className="rec-hover" style={{
                         borderRadius: 20, padding: '28px',
-                        background: isDark ? t.card : t.cardLow,
-                        border: `2px solid ${t.accent}35`,
-                        boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(28,28,17,0.07)',
-                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         background: `linear-gradient(135deg, ${isDark ? 'rgba(74,225,131,0.06)' : 'rgba(27,109,36,0.04)'} 0%, ${isDark ? 'rgba(163,201,255,0.04)' : 'rgba(0,52,97,0.03)'} 100%)`,
                         border: `1.5px solid ${t.accent}30`,
+                        boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(28,28,17,0.07)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                       }}>
                         <div>
                           <span style={{

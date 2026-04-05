@@ -239,19 +239,7 @@ export default function Analytics() {
 
                 <div style={{ position: 'relative', zIndex: 1, maxWidth: 1080, margin: '0 auto', padding: '0 24px 100px' }}>
 
-                    {/* ── Nav ── */}
-                    <nav style={{
-                        position: 'sticky', top: 0, zIndex: 50,
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        height: 68,
-                        background: t.navBg, backdropFilter: 'blur(18px)',
-                        borderBottom: `1px solid ${t.border}`,
-                        margin: '0 -24px', padding: '0 24px',
-                    }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase', color: t.accent }}>
-                            Travel Journal
-                        </div>
-                    </nav>
+
 
                     {/* ── Header ── */}
                     <header style={{ margin: '48px 0 32px', animation: 'an-fade 0.45s ease both' }}>

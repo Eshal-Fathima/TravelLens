@@ -415,27 +415,31 @@ export default function TripLogger() {
 
         <div style={{ position: 'relative', zIndex: 1, maxWidth: 1000, margin: '0 auto', padding: '0 24px 100px' }}>
 
-          {/* ── Nav ── */}
-          <nav style={{
-            position: 'sticky', top: 0, zIndex: 50,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            height: 68,
-            background: isDark ? 'rgba(10,10,10,0.80)' : 'rgba(253,250,231,0.85)',
-            backdropFilter: 'blur(18px)',
-            borderBottom: `1px solid ${t.border}`,
-            margin: '0 -24px', padding: '0 24px',
-          }}>
-            <div style={{
-              fontSize: 13, fontWeight: 700, letterSpacing: '3px',
-              textTransform: 'uppercase', color: t.accent,
-              fontFamily: 'Manrope, sans-serif',
-            }}>Travel Journal</div>
+
+
+          {/* ── Page header ── */}
+          <header style={{ maxWidth: 900, margin: '48px auto 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 16 }}>
+            <div>
+              <p style={{
+                fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+                letterSpacing: '3px', color: t.accent, marginBottom: 10,
+                fontFamily: 'Manrope, sans-serif',
+              }}>Adventure Quest</p>
+              <h1 style={{
+                fontSize: 'clamp(36px, 6vw, 62px)', fontWeight: 900,
+                letterSpacing: '-2px', color: t.primary,
+                lineHeight: 1, fontFamily: 'Manrope, sans-serif', margin: 0,
+              }}>
+                Your Journey{' '}
+                <em style={{ fontFamily: 'Lora, serif', fontWeight: 700, color: t.accent, fontStyle: 'italic' }}>Log.</em>
+              </h1>
+            </div>
             <button
               onClick={openNew}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 background: t.primary, color: isDark ? '#001e3c' : '#fff',
-                padding: '10px 22px', borderRadius: 12,
+                padding: '12px 24px', borderRadius: 12,
                 fontFamily: 'Manrope, sans-serif', fontSize: 13, fontWeight: 700,
                 border: 'none', cursor: 'pointer', transition: 'transform 0.18s, opacity 0.18s',
               }}
@@ -444,23 +448,6 @@ export default function TripLogger() {
             >
               <PlusIcon /> New Trip
             </button>
-          </nav>
-
-          {/* ── Page header ── */}
-          <header style={{ maxWidth: 900, margin: '48px auto 40px' }}>
-            <p style={{
-              fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-              letterSpacing: '3px', color: t.accent, marginBottom: 10,
-              fontFamily: 'Manrope, sans-serif',
-            }}>Adventure Quest</p>
-            <h1 style={{
-              fontSize: 'clamp(36px, 6vw, 62px)', fontWeight: 900,
-              letterSpacing: '-2px', color: t.primary,
-              lineHeight: 1, fontFamily: 'Manrope, sans-serif', margin: 0,
-            }}>
-              Your Journey{' '}
-              <em style={{ fontFamily: 'Lora, serif', fontWeight: 700, color: t.accent, fontStyle: 'italic' }}>Log.</em>
-            </h1>
           </header>
 
           {/* ── Body ── */}
