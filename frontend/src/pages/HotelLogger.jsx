@@ -202,6 +202,7 @@ export default function HotelLogger() {
           <header style={{
             display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-end',
             gap: 16, marginBottom: 36, animation: 'hl-fade 0.45s ease both',
+            position: 'relative', zIndex: 100,  // ← FIX: header sits above all content below
           }}>
             <div>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase', color: t.accent, margin: '0 0 10px' }}>
@@ -215,7 +216,7 @@ export default function HotelLogger() {
 
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               {/* Trip selector */}
-              <div data-trip-dropdown style={{ position: 'relative', zIndex: 10 }}>
+              <div data-trip-dropdown style={{ position: 'relative', zIndex: 200 }}>  {/* ← FIX: high z-index on dropdown wrapper */}
                 <button
                   onClick={() => setTripDropOpen(o => !o)}
                   style={{
@@ -286,6 +287,7 @@ export default function HotelLogger() {
               display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
               gap: 16, marginBottom: 48,
               animation: 'hl-fade 0.45s 0.08s ease both',
+              position: 'relative', zIndex: 1,  // ← FIX: kept below header
             }}>
               {/* Total Accommodation — left border accent */}
               <div className="hl-stat" style={{
@@ -351,129 +353,131 @@ export default function HotelLogger() {
           )}
 
           {/* ── Winding Path Timeline ── */}
-          {selectedTrip ? (
-            loading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-                <div style={{ width: 34, height: 34, borderRadius: '50%', border: `3px solid ${t.border}`, borderTopColor: t.primary, animation: 'hl-spin 0.8s linear infinite' }} />
-              </div>
-            ) : hotels.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px', animation: 'hl-fade 0.45s ease both' }}>
-                <p style={{ fontSize: 48, marginBottom: 14 }}>🏨</p>
-                <p style={{ fontSize: 18, fontWeight: 700, color: t.textPrimary, margin: '0 0 8px' }}>No hotels logged</p>
-                <p style={{ fontSize: 13, color: t.textMuted, margin: '0 0 24px' }}>Add your accommodation details for this trip</p>
-                <button className="hl-btn" onClick={openNew} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 8,
-                  padding: '12px 24px', borderRadius: 12, border: 'none',
-                  background: t.primary, color: isDark ? '#001e3c' : '#fff',
-                  fontSize: 13, fontWeight: 700, fontFamily: 'Manrope, sans-serif',
-                }}><PlusIcon /> Add First Hotel</button>
-              </div>
-            ) : (
-              <div style={{ position: 'relative', maxWidth: 820, margin: '0 auto', animation: 'hl-fade 0.45s 0.16s ease both' }}>
+          <div style={{ position: 'relative', zIndex: 1 }}>  {/* ← FIX: timeline kept below header */}
+            {selectedTrip ? (
+              loading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: '50%', border: `3px solid ${t.border}`, borderTopColor: t.primary, animation: 'hl-spin 0.8s linear infinite' }} />
+                </div>
+              ) : hotels.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 20px', animation: 'hl-fade 0.45s ease both' }}>
+                  <p style={{ fontSize: 48, marginBottom: 14 }}>🏨</p>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: t.textPrimary, margin: '0 0 8px' }}>No hotels logged</p>
+                  <p style={{ fontSize: 13, color: t.textMuted, margin: '0 0 24px' }}>Add your accommodation details for this trip</p>
+                  <button className="hl-btn" onClick={openNew} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '12px 24px', borderRadius: 12, border: 'none',
+                    background: t.primary, color: isDark ? '#001e3c' : '#fff',
+                    fontSize: 13, fontWeight: 700, fontFamily: 'Manrope, sans-serif',
+                  }}><PlusIcon /> Add First Hotel</button>
+                </div>
+              ) : (
+                <div style={{ position: 'relative', maxWidth: 820, margin: '0 auto', animation: 'hl-fade 0.45s 0.16s ease both' }}>
 
-                {/* Winding path SVG — same as TripLogger */}
-                <svg style={{
-                  position: 'absolute', top: 0, left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '100%', height: '100%',
-                  pointerEvents: 'none', opacity: 0.15,
-                }} preserveAspectRatio="none" viewBox="0 0 100 1000">
-                  <path
-                    d="M50,0 Q80,100 50,200 T50,400 T30,600 T70,800 T50,1000"
-                    fill="none" stroke={isDark ? '#a3c9ff' : '#003461'}
-                    strokeDasharray="8 8" strokeWidth="2"
-                  />
-                </svg>
+                  {/* Winding path SVG */}
+                  <svg style={{
+                    position: 'absolute', top: 0, left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '100%', height: '100%',
+                    pointerEvents: 'none', opacity: 0.15,
+                  }} preserveAspectRatio="none" viewBox="0 0 100 1000">
+                    <path
+                      d="M50,0 Q80,100 50,200 T50,400 T30,600 T70,800 T50,1000"
+                      fill="none" stroke={isDark ? '#a3c9ff' : '#003461'}
+                      strokeDasharray="8 8" strokeWidth="2"
+                    />
+                  </svg>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 48 }}>
-                  {hotels.map((hotel, idx) => {
-                    const goLeft = idx % 2 === 0
-                    const isFirst = idx === 0
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 48 }}>
+                    {hotels.map((hotel, idx) => {
+                      const goLeft = idx % 2 === 0
+                      const isFirst = idx === 0
 
-                    return (
-                      <div key={hotel.id} style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 64px 1fr',
-                        alignItems: 'center',
-                        gap: '0 16px',
-                        position: 'relative', zIndex: 2,
-                      }}>
-                        {/* LEFT slot */}
-                        <div style={{ gridColumn: 1 }}>
-                          {goLeft && (
-                            <HotelCard hotel={hotel} idx={idx} onEdit={openEdit} onDelete={handleDelete} t={t} isDark={isDark} />
-                          )}
-                        </div>
+                      return (
+                        <div key={hotel.id} style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 64px 1fr',
+                          alignItems: 'center',
+                          gap: '0 16px',
+                          position: 'relative', zIndex: 2,
+                        }}>
+                          {/* LEFT slot */}
+                          <div style={{ gridColumn: 1 }}>
+                            {goLeft && (
+                              <HotelCard hotel={hotel} idx={idx} onEdit={openEdit} onDelete={handleDelete} t={t} isDark={isDark} />
+                            )}
+                          </div>
 
-                        {/* CENTRE — node */}
-                        <div style={{ gridColumn: 2, display: 'flex', justifyContent: 'center', position: 'relative' }}>
-                          {isFirst ? (
-                            <div style={{ position: 'relative' }}>
+                          {/* CENTRE — node */}
+                          <div style={{ gridColumn: 2, display: 'flex', justifyContent: 'center', position: 'relative' }}>
+                            {isFirst ? (
+                              <div style={{ position: 'relative' }}>
+                                <div style={{
+                                  position: 'absolute', inset: 0, borderRadius: '50%',
+                                  border: `2px solid ${t.nodeBg}`,
+                                  animation: 'hl-ping 2s cubic-bezier(0,0,0.2,1) infinite',
+                                }} />
+                                <div style={{
+                                  width: 48, height: 48, borderRadius: '50%',
+                                  background: t.nodeBg, color: t.nodeFg,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  boxShadow: `0 0 0 6px ${t.primaryFaded}, 0 0 24px ${t.primaryFaded}`,
+                                  position: 'relative', zIndex: 1,
+                                }}>
+                                  <HotelIcon />
+                                </div>
+                              </div>
+                            ) : (
                               <div style={{
-                                position: 'absolute', inset: 0, borderRadius: '50%',
-                                border: `2px solid ${t.nodeBg}`,
-                                animation: 'hl-ping 2s cubic-bezier(0,0,0.2,1) infinite',
-                              }} />
-                              <div style={{
-                                width: 48, height: 48, borderRadius: '50%',
-                                background: t.nodeBg, color: t.nodeFg,
+                                width: 40, height: 40, borderRadius: '50%',
+                                background: t.nodeInactiveBg,
+                                border: `2px solid ${t.border}`,
+                                color: t.nodeInactiveFg,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                boxShadow: `0 0 0 6px ${t.primaryFaded}, 0 0 24px ${t.primaryFaded}`,
-                                position: 'relative', zIndex: 1,
                               }}>
                                 <HotelIcon />
                               </div>
-                            </div>
-                          ) : (
-                            <div style={{
-                              width: 40, height: 40, borderRadius: '50%',
-                              background: t.nodeInactiveBg,
-                              border: `2px solid ${t.border}`,
-                              color: t.nodeInactiveFg,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                              <HotelIcon />
-                            </div>
-                          )}
-                        </div>
+                            )}
+                          </div>
 
-                        {/* RIGHT slot */}
-                        <div style={{ gridColumn: 3 }}>
-                          {!goLeft && (
-                            <HotelCard hotel={hotel} idx={idx} onEdit={openEdit} onDelete={handleDelete} t={t} isDark={isDark} />
-                          )}
+                          {/* RIGHT slot */}
+                          <div style={{ gridColumn: 3 }}>
+                            {!goLeft && (
+                              <HotelCard hotel={hotel} idx={idx} onEdit={openEdit} onDelete={handleDelete} t={t} isDark={isDark} />
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
 
-                  {/* Add next waypoint placeholder */}
-                  <div style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-                    opacity: 0.45, marginTop: 8,
-                  }}>
+                    {/* Add next waypoint placeholder */}
                     <div style={{
-                      width: 44, height: 44, borderRadius: '50%',
-                      border: `2px dashed ${t.primary}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: t.primary, cursor: 'pointer', transition: 'opacity 0.2s',
-                    }} onClick={openNew}>
-                      <PlusIcon />
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                      opacity: 0.45, marginTop: 8,
+                    }}>
+                      <div style={{
+                        width: 44, height: 44, borderRadius: '50%',
+                        border: `2px dashed ${t.primary}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: t.primary, cursor: 'pointer', transition: 'opacity 0.2s',
+                      }} onClick={openNew}>
+                        <PlusIcon />
+                      </div>
+                      <p style={{ fontSize: 13, fontWeight: 700, fontStyle: 'italic', color: t.primary, margin: 0, fontFamily: 'Lora, serif' }}>
+                        Map your next waypoint…
+                      </p>
                     </div>
-                    <p style={{ fontSize: 13, fontWeight: 700, fontStyle: 'italic', color: t.primary, margin: 0, fontFamily: 'Lora, serif' }}>
-                      Map your next waypoint…
-                    </p>
                   </div>
                 </div>
+              )
+            ) : (
+              <div style={{ textAlign: 'center', padding: '80px 20px' }}>
+                <p style={{ fontSize: 48, marginBottom: 14 }}>🏨</p>
+                <p style={{ fontSize: 16, fontWeight: 700, color: t.textPrimary, margin: '0 0 6px' }}>Select a trip</p>
+                <p style={{ fontSize: 13, color: t.textMuted }}>Choose a trip to view and add hotels</p>
               </div>
-            )
-          ) : (
-            <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-              <p style={{ fontSize: 48, marginBottom: 14 }}>🏨</p>
-              <p style={{ fontSize: 16, fontWeight: 700, color: t.textPrimary, margin: '0 0 6px' }}>Select a trip</p>
-              <p style={{ fontSize: 13, color: t.textMuted }}>Choose a trip to view and add hotels</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

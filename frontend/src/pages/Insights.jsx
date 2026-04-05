@@ -1,674 +1,624 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/axios'
 import { useTheme } from '../design/Themecontext'
+import { Spinner, EmptyState } from '../design/UI'
+import { useNavigate } from 'react-router-dom'
 
-/* ─── Theme tokens ───────────────────────────────────────────────────── */
+// ─── Theme tokens (same pattern as TripLogger) ────────────────────────────────
 const themes = {
   light: {
     bg: '#fdfae7',
     surface: '#f7f4e1',
     card: '#ffffff',
+    cardLow: '#f7f4e1',
+    cardMid: '#f1eedb',
+    cardHigh: '#ece9d6',
+    cardHighest: '#e6e3d0',
     border: 'rgba(66,71,80,0.12)',
+    borderStrong: '#c2c6d1',
     textPrimary: '#1c1c11',
     textSecond: '#424750',
     textMuted: '#727781',
     primary: '#003461',
     primaryFaded: '#004b8718',
+    primaryFixed: '#d3e4ff',
     accent: '#1b6d24',
     accentFaded: '#1b6d2418',
+    tertiary: '#611a07',
+    navBg: 'rgba(253,250,231,0.85)',
+    progressBg: '#e6e3d0',
+    heroBg: '#004b87',
+    heroSubText: '#8abcff',
+    progressP: '#003461',
+    progressA: '#1b6d24',
+    progressT: '#611a07',
+    // color-coded stat card bottom borders
+    s1: { border: '#003461', iconBg: '#d3e4ff', iconColor: '#003461', badge: '#1b6d24' },
+    s2: { border: '#1b6d24', iconBg: '#a0f399', iconColor: '#1b6d24', badge: '#727781' },
+    s3: { border: '#611a07', iconBg: '#ffdbd2', iconColor: '#611a07', badge: '#611a07' },
+    s4: { border: '#727781', iconBg: '#e6e3d0', iconColor: '#424750', badge: '#424750' },
   },
   dark: {
     bg: '#0a0a0a',
     surface: '#141414',
     card: '#1a1a1a',
+    cardLow: '#141414',
+    cardMid: '#1f1f1f',
+    cardHigh: '#2a2a2a',
+    cardHighest: '#353535',
     border: 'rgba(255,255,255,0.08)',
+    borderStrong: 'rgba(255,255,255,0.15)',
     textPrimary: '#f0f0f0',
     textSecond: '#b0b0b0',
     textMuted: '#666666',
     primary: '#a3c9ff',
     primaryFaded: '#a3c9ff14',
+    primaryFixed: '#a3c9ff20',
     accent: '#4ae183',
     accentFaded: '#4ae18314',
+    tertiary: '#ffb4a1',
+    navBg: 'rgba(10,10,10,0.80)',
+    progressBg: '#1e2f4a',
+    heroBg: '#0d1f35',
+    heroSubText: '#a3c9ff',
+    progressP: '#3b82f6',
+    progressA: '#10b981',
+    progressT: '#f97316',
+    // color-coded stat card bottom borders
+    s1: { border: '#3b82f6', iconBg: '#3b82f618', iconColor: '#3b82f6', badge: '#10b981' },
+    s2: { border: '#10b981', iconBg: '#10b98118', iconColor: '#10b981', badge: '#666666' },
+    s3: { border: '#8b5cf6', iconBg: '#8b5cf618', iconColor: '#8b5cf6', badge: '#8b5cf6' },
+    s4: { border: '#f97316', iconBg: '#f9731618', iconColor: '#f97316', badge: '#f97316' },
   },
 }
 
-const TRAVEL_COLORS = {
-  Solo: { accent: '#a3c9ff', icon: '🧭' },
-  Family: { accent: '#4ae183', icon: '🏡' },
-  Friends: { accent: '#ffb68b', icon: '🎉' },
+// ─── Data Maps ────────────────────────────────────────────────────────────────
+const PERSONALITY_META = {
+  'Budget Explorer': { emoji: '🎒', archetype: 'The Thrifty Wanderer', desc: "You love exploring the world while being smart with your money. Budget travel doesn't mean compromising on experiences!" },
+  'Smart Traveler': { emoji: '🧠', archetype: 'The Archetype', desc: 'You balance adventure with precision. Most trips were planned with a detailed itinerary, yet you always found space for serendipitous discovery.' },
+  'Comfort Seeker': { emoji: '🛋️', archetype: 'The Refined Explorer', desc: 'You believe in traveling comfortably and are willing to invest in premium experiences that make every journey memorable.' },
+  'Luxury Traveler': { emoji: '💎', archetype: 'The Elite Voyager', desc: 'You spare no expense. Luxury, exclusivity, and premium experiences are your hallmark wherever you roam.' },
+  'New Traveler': { emoji: '🌱', archetype: 'The Fresh Adventurer', desc: "You're just beginning your travel journey. Every trip is a new adventure waiting to unfold!" },
 }
 
-const defaultForm = {
-  trip_name: '', destination: '', start_date: '',
-  end_date: '', budget: '', travel_type: 'Solo',
+const PREF_ICONS = {
+  Beach: '🏖️', 'Beach Lover': '🏖️',
+  Mountain: '⛰️', 'Mountain Explorer': '⛰️',
+  Cultural: '🏛️', 'Cultural Explorer': '🏛️',
+  City: '🏙️', 'City Explorer': '🏙️',
+  Explorer: '🗺️',
+}
+function getPrefIcon(pref) {
+  if (!pref) return '🗺️'
+  return PREF_ICONS[pref] || PREF_ICONS[pref?.split(' ')[0]] || '🗺️'
 }
 
-/* ─── Icons ──────────────────────────────────────────────────────────── */
-const PlusIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-  </svg>
-)
-const EditIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-  </svg>
-)
-const TrashIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-    <path d="M10 11v6" /><path d="M14 11v6" />
-    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-  </svg>
-)
-const CalIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-    <line x1="16" y1="2" x2="16" y2="6" />
-    <line x1="8" y1="2" x2="8" y2="6" />
-    <line x1="3" y1="10" x2="21" y2="10" />
-  </svg>
-)
-const PinIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-    <circle cx="12" cy="10" r="3" />
-  </svg>
-)
-const WalletIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" />
-    <path d="M4 6v12c0 1.1.9 2 2 2h14v-4" />
-    <path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" />
-  </svg>
-)
-const CloseIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-)
-const FlagIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-    <line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+const DEST_COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f97316', '#06b6d4', '#f59e0b']
+function fmt(n) { return Number(n || 0).toLocaleString('en-IN') }
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+const ArrowIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
   </svg>
 )
 
-/* ─── Helpers ────────────────────────────────────────────────────────── */
-const getDuration = (start, end) => {
-  const d = Math.ceil((new Date(end) - new Date(start)) / 86400000)
-  return d > 0 ? `${d} day${d > 1 ? 's' : ''}` : null
-}
-const fmtDate = (iso, opts) => new Date(iso).toLocaleDateString('en-IN', opts)
-const fmtMonth = (iso) =>
-  new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()
+// ─── Component ────────────────────────────────────────────────────────────────
+export default function Insights() {
+  const { user } = useAuth()
+  const { dark: ctxDark } = useTheme()
+  const navigate = useNavigate()
 
-const flattenTrips = (trips) => trips.map((t, i) => ({ ...t, _globalIdx: i }))
-
-const groupByMonth = (trips) => {
-  const map = {}
-  trips.forEach(t => {
-    const key = fmtMonth(t.start_date)
-    if (!map[key]) map[key] = []
-    map[key].push(t)
-  })
-  return Object.entries(map)
-}
-
-/* ─── TripCard ───────────────────────────────────────────────────────── */
-function TripCard({ trip, tripNumber, onEdit, onDelete, t, isDark }) {
-  const { accent, icon } = TRAVEL_COLORS[trip.travel_type] || TRAVEL_COLORS.Solo
-  const duration = getDuration(trip.start_date, trip.end_date)
-
-  return (
-    <div
-      style={{
-        background: t.card,
-        border: `1px solid ${t.border}`,
-        borderRadius: 20,
-        overflow: 'hidden',
-        transition: 'transform 0.22s, box-shadow 0.22s',
-        fontFamily: 'Manrope, sans-serif',
-        boxShadow: isDark
-          ? '0px 12px 32px rgba(0,0,0,0.35)'
-          : '0px 12px 32px rgba(28,28,17,0.06)',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-4px)'
-        e.currentTarget.style.boxShadow = isDark
-          ? '0 16px 48px rgba(0,0,0,0.55)'
-          : '0 16px 48px rgba(28,28,17,0.12)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.transform = 'translateY(0)'
-        e.currentTarget.style.boxShadow = isDark
-          ? '0px 12px 32px rgba(0,0,0,0.35)'
-          : '0px 12px 32px rgba(28,28,17,0.06)'
-      }}
-    >
-      {/* accent bar */}
-      <div style={{ height: 4, background: `linear-gradient(90deg, ${accent}, ${accent}55)` }} />
-
-      <div style={{ padding: '20px 22px' }}>
-        {/* trip number + actions */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-          <div>
-            <p style={{
-              fontSize: 9, fontWeight: 700, letterSpacing: '2px',
-              textTransform: 'uppercase', color: t.textMuted,
-              margin: '0 0 6px', fontFamily: 'Manrope, sans-serif',
-            }}>
-              Trip {String(tripNumber).padStart(2, '0')}
-            </p>
-            <h3 style={{
-              fontSize: 16, fontWeight: 800, color: t.textPrimary,
-              margin: '0 0 6px', fontFamily: 'Manrope, sans-serif',
-              letterSpacing: '-0.3px',
-            }}>{trip.trip_name}</h3>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 10, fontWeight: 700, letterSpacing: '1.2px',
-              textTransform: 'uppercase',
-              padding: '3px 9px', borderRadius: 999,
-              background: accent + '18', color: accent,
-              border: `1px solid ${accent}30`,
-              fontFamily: 'Manrope, sans-serif',
-            }}>
-              {icon} {trip.travel_type}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <button
-              onClick={() => onEdit(trip)}
-              style={{
-                width: 30, height: 30, borderRadius: 8, border: `1px solid ${t.border}`,
-                background: 'transparent', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: t.textMuted, transition: 'all 0.18s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = t.primaryFaded; e.currentTarget.style.color = t.primary }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = t.textMuted }}
-            ><EditIcon /></button>
-            <button
-              onClick={() => onDelete(trip.id)}
-              style={{
-                width: 30, height: 30, borderRadius: 8,
-                border: '1px solid rgba(239,68,68,0.25)',
-                background: 'transparent', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#ef4444', transition: 'all 0.18s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.10)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-            ><TrashIcon /></button>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: t.textSecond, fontFamily: 'Manrope, sans-serif' }}>
-            <PinIcon />{trip.destination}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: t.textSecond, fontFamily: 'Manrope, sans-serif', flexWrap: 'wrap' }}>
-            <CalIcon />
-            {fmtDate(trip.start_date, { month: 'short', day: 'numeric' })} –{' '}
-            {fmtDate(trip.end_date, { month: 'short', day: 'numeric', year: 'numeric' })}
-            {duration && (
-              <span style={{
-                fontSize: 10, padding: '1px 7px', borderRadius: 999,
-                background: accent + '15', color: accent, fontWeight: 700,
-              }}>{duration}</span>
-            )}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: t.textSecond, fontFamily: 'Manrope, sans-serif' }}>
-            <WalletIcon />
-            Budget: <strong style={{ color: t.textPrimary, fontWeight: 800 }}>
-              ₹{trip.budget?.toLocaleString('en-IN')}
-            </strong>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ─── Modal ──────────────────────────────────────────────────────────── */
-function TripModal({ title, onClose, t, isDark, children }) {
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose()
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    <div
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 200,
-        background: isDark ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.40)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 20, animation: 'tl-fade-in 0.18s ease',
-      }}
-    >
-      <div style={{
-        background: t.card, border: `1px solid ${t.border}`,
-        borderRadius: 24, padding: 32,
-        width: '100%', maxWidth: 500,
-        boxShadow: '0 40px 80px rgba(0,0,0,0.25)',
-        animation: 'tl-slide-up 0.22s cubic-bezier(0.34,1.56,0.64,1)',
-        fontFamily: 'Manrope, sans-serif',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 26 }}>
-          <h2 style={{
-            fontSize: 22, fontWeight: 900, letterSpacing: '-0.5px',
-            color: t.textPrimary, fontFamily: 'Manrope, sans-serif', margin: 0,
-          }}>{title}</h2>
-          <button
-            onClick={onClose}
-            style={{
-              width: 34, height: 34, borderRadius: 10,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: t.surface, border: `1px solid ${t.border}`,
-              color: t.textMuted, cursor: 'pointer', transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = t.primaryFaded; e.currentTarget.style.color = t.primary }}
-            onMouseLeave={e => { e.currentTarget.style.background = t.surface; e.currentTarget.style.color = t.textMuted }}
-          ><CloseIcon /></button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-/* ─── Form helpers ───────────────────────────────────────────────────── */
-function FieldLabel({ children, t }) {
-  return (
-    <label style={{
-      fontSize: 10, fontWeight: 700, letterSpacing: '1.5px',
-      textTransform: 'uppercase', color: t.textMuted,
-      fontFamily: 'Manrope, sans-serif', display: 'block', marginBottom: 6,
-    }}>{children}</label>
-  )
-}
-function TlInput({ t, ...props }) {
-  return (
-    <input
-      style={{
-        width: '100%', background: t.surface, border: `1px solid ${t.border}`,
-        borderRadius: 12, padding: '11px 14px', color: t.textPrimary,
-        fontFamily: 'Manrope, sans-serif', fontSize: 13,
-        outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s',
-      }}
-      onFocus={e => { e.target.style.borderColor = t.primary; e.target.style.boxShadow = `0 0 0 3px ${t.primaryFaded}` }}
-      onBlur={e => { e.target.style.borderColor = t.border; e.target.style.boxShadow = 'none' }}
-      {...props}
-    />
-  )
-}
-function TlSelect({ t, children, ...props }) {
-  return (
-    <select
-      style={{
-        width: '100%', background: t.surface, border: `1px solid ${t.border}`,
-        borderRadius: 12, padding: '11px 14px', color: t.textPrimary,
-        fontFamily: 'Manrope, sans-serif', fontSize: 13,
-        outline: 'none', cursor: 'pointer', appearance: 'none',
-        transition: 'border-color 0.15s, box-shadow 0.15s',
-      }}
-      onFocus={e => { e.target.style.borderColor = t.primary; e.target.style.boxShadow = `0 0 0 3px ${t.primaryFaded}` }}
-      onBlur={e => { e.target.style.borderColor = t.border; e.target.style.boxShadow = 'none' }}
-      {...props}
-    >{children}</select>
-  )
-}
-
-/* ─── Main Component ─────────────────────────────────────────────────── */
-export default function TripLogger() {
-  const { dark } = useTheme()
-  const [isDark, setIsDark] = useState(dark ?? false)
-  useEffect(() => { if (dark !== undefined) setIsDark(dark) }, [dark])
+  const [isDark, setIsDark] = useState(ctxDark ?? false)
+  useEffect(() => { if (ctxDark !== undefined) setIsDark(ctxDark) }, [ctxDark])
   const t = themes[isDark ? 'dark' : 'light']
 
-  const [trips, setTrips] = useState([])
+  const [insights, setInsights] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState(defaultForm)
 
-  useEffect(() => { fetchTrips() }, [])
+  useEffect(() => {
+    api.get(`/api/insights/${user.id}`)
+      .then(r => setInsights(r.data.insights))
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [user.id])
 
-  const fetchTrips = async () => {
-    try {
-      const r = await api.get('/api/trips')
-      setTrips(r.data.trips)
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
+  if (loading) return <Spinner />
+
+  if (!insights || insights.total_trips === 0) {
+    return (
+      <EmptyState
+        icon="🗺️"
+        title="No travel data yet"
+        desc="Start logging your trips to unlock your personalized travel insights"
+      />
+    )
   }
 
-  const openNew = () => { setForm(defaultForm); setEditing(null); setShowForm(true) }
-  const openEdit = (trip) => {
-    setEditing(trip)
-    setForm({
-      trip_name: trip.trip_name,
-      destination: trip.destination,
-      start_date: trip.start_date?.split('T')[0] || '',
-      end_date: trip.end_date?.split('T')[0] || '',
-      budget: trip.budget?.toString() || '',
-      travel_type: trip.travel_type,
-    })
-    setShowForm(true)
-  }
-  const closeForm = () => { setShowForm(false); setEditing(null) }
+  const meta = PERSONALITY_META[insights?.travel_personality] || PERSONALITY_META['New Traveler']
+  const ba = insights?.budget_analysis || {}
+  const utilPct = Math.min(ba.budget_utilization ?? 0, 100)
+  const isOver = (ba.budget_utilization ?? 0) > 100
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    const data = { ...form, budget: parseFloat(form.budget) }
-    if (isNaN(data.budget) || data.budget <= 0) { alert('Enter a valid budget'); return }
-    try {
-      if (editing) await api.put(`/api/trips/${editing.id}`, data)
-      else await api.post('/api/trips', data)
-      fetchTrips(); closeForm()
-    } catch (err) { console.error(err); alert('Error saving trip.') }
-  }
+  // Segmented budget bar proportions
+  const staysPct = +(utilPct * 0.55).toFixed(1)
+  const flightsPct = +(utilPct * 0.25).toFixed(1)
+  const diningPct = +(Math.max(0, utilPct - staysPct - flightsPct)).toFixed(1)
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this trip?')) return
-    try { await api.delete(`/api/trips/${id}`); fetchTrips() }
-    catch (e) { console.error(e) }
-  }
-
-  const f = (key) => ({
-    value: form[key],
-    onChange: (e) => setForm({ ...form, [key]: e.target.value }),
-  })
-
-  const flat = flattenTrips(trips)
-  const grouped = groupByMonth(flat)
-
-  const nodeDotActive = isDark ? t.accent : t.primary
-  const nodeFg = isDark ? '#002204' : '#ffffff'
-  const pathColor = isDark ? '#a3c9ff' : '#003461'
+  const statCards = [
+    {
+      label: 'Total Trips',
+      value: insights.total_trips,
+      icon: '✈️',
+      badge: `+${Math.max(1, Math.round((insights.total_trips || 0) * 0.12))} vs last yr`,
+      s: t.s1,
+    },
+    {
+      label: 'Total Spent',
+      value: `₹${fmt(insights.total_spent || 0)}`,
+      icon: '💸',
+      badge: isOver ? 'Over Budget' : 'Within Budget',
+      s: t.s2,
+    },
+    {
+      label: 'Places Explored',
+      value: insights.countries_visited ?? '–',
+      icon: '📍',
+      badge: 'New Milestone',
+      s: t.s3,
+    },
+    {
+      label: 'Trips per Year',
+      value: insights.travel_frequency ?? '–',
+      icon: '📅',
+      badge: 'Consistent',
+      s: t.s4,
+    },
+  ]
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=Lora:ital,wght@1,700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=Lora:ital,wght@0,700;1,700&display=swap');
         * { box-sizing: border-box; }
-        @keyframes tl-fade-in  { from{opacity:0} to{opacity:1} }
-        @keyframes tl-slide-up { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
-        @keyframes tl-spin     { to{transform:rotate(360deg)} }
-        @keyframes tl-ping     { 0%{transform:scale(1);opacity:.5} 100%{transform:scale(1.8);opacity:0} }
+        @keyframes ins-fade { from { opacity:0; transform:translateY(14px) } to { opacity:1; transform:translateY(0) } }
+        .ins-hover  { transition: transform 0.22s, box-shadow 0.22s; cursor:default; }
+        .ins-hover:hover { transform: translateY(-3px); }
+        .ins-btn    { transition: opacity 0.18s, transform 0.18s; cursor:pointer; }
+        .ins-btn:hover  { opacity: 0.85; transform: scale(1.02); }
+        .ins-tag    { transition: border-color 0.18s, transform 0.18s; cursor:default; }
+        .ins-tag:hover  { transform: scale(1.03); }
       `}</style>
 
       <div style={{ minHeight: '100vh', background: t.bg, fontFamily: 'Manrope, sans-serif', transition: 'background 0.3s' }}>
 
-        {/* dot-grid background */}
+        {/* dot-grid background — matches TripLogger */}
         <div style={{
           position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
           backgroundImage: `radial-gradient(${isDark ? 'rgba(163,201,255,0.07)' : 'rgba(0,52,97,0.06)'} 1px, transparent 1px)`,
           backgroundSize: '38px 38px',
         }} />
 
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: 1000, margin: '0 auto', padding: '0 24px 100px' }}>
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 1080, margin: '0 auto', padding: '0 24px 100px' }}>
 
 
 
-          {/* ── Page header ── */}
-          <header style={{ maxWidth: 900, margin: '48px auto 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 16 }}>
+          {/* ── Page Header ─────────────────────────────────────────────── */}
+          <header style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
+            flexWrap: 'wrap', gap: 16, margin: '48px 0 36px',
+            animation: 'ins-fade 0.45s ease both',
+          }}>
             <div>
-              <p style={{
-                fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-                letterSpacing: '3px', color: t.accent, marginBottom: 10,
-                fontFamily: 'Manrope, sans-serif',
-              }}>Adventure Quest</p>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase', color: t.accent, margin: '0 0 10px' }}>
+                Your Year in Travel
+              </p>
               <h1 style={{
-                fontSize: 'clamp(36px, 6vw, 62px)', fontWeight: 900,
+                fontSize: 'clamp(36px,5vw,58px)', fontWeight: 900,
                 letterSpacing: '-2px', color: t.primary,
-                lineHeight: 1, fontFamily: 'Manrope, sans-serif', margin: 0,
-              }}>
-                Your Journey{' '}
-                <em style={{ fontFamily: 'Lora, serif', fontWeight: 700, color: t.accent, fontStyle: 'italic' }}>Log.</em>
-              </h1>
+                lineHeight: 1, margin: '0 0 10px', fontFamily: 'Manrope, sans-serif',
+              }}>Travel Wrapped ✨</h1>
+              <p style={{ fontSize: 15, color: t.textMuted, margin: 0 }}>
+                Your personalized travel insights for {new Date().getFullYear()}
+              </p>
             </div>
-            <button
-              onClick={openNew}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                background: t.primary, color: isDark ? '#001e3c' : '#fff',
-                padding: '12px 24px', borderRadius: 12,
-                fontFamily: 'Manrope, sans-serif', fontSize: 13, fontWeight: 700,
-                border: 'none', cursor: 'pointer', transition: 'transform 0.18s, opacity 0.18s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '.85'; e.currentTarget.style.transform = 'scale(1.03)' }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1)' }}
-            >
-              <PlusIcon /> New Trip
-            </button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button className="ins-btn" style={{
+                padding: '11px 22px', borderRadius: 12,
+                background: t.cardHigh, border: `1px solid ${t.border}`,
+                color: t.primary, fontWeight: 700, fontSize: 13, fontFamily: 'Manrope, sans-serif',
+              }}>Share Report</button>
+              <button className="ins-btn" style={{
+                padding: '11px 22px', borderRadius: 12,
+                background: t.primary, border: 'none',
+                color: isDark ? '#001e3c' : '#fff',
+                fontWeight: 700, fontSize: 13, fontFamily: 'Manrope, sans-serif',
+              }}>Export PDF</button>
+              <button
+                className="ins-btn"
+                onClick={() => navigate('/analytics')}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7,
+                  padding: '11px 18px', borderRadius: 12,
+                  background: t.primaryFaded, border: `1px solid ${t.border}`,
+                  color: t.primary, fontSize: 13, fontWeight: 700,
+                  fontFamily: 'Manrope, sans-serif',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = t.primary; e.currentTarget.style.color = isDark ? '#001e3c' : '#fff' }}
+                onMouseLeave={e => { e.currentTarget.style.background = t.primaryFaded; e.currentTarget.style.color = t.primary }}
+              >
+                📊 Analytics <ArrowIcon />
+              </button>
+            </div>
           </header>
 
-          {/* ── Body ── */}
-          {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: '50%',
-                border: `3px solid ${t.border}`, borderTopColor: t.primary,
-                animation: 'tl-spin 0.8s linear infinite',
-              }} />
-            </div>
-
-          ) : trips.length === 0 ? (
-            <div style={{
-              textAlign: 'center', padding: '60px 24px',
-              borderRadius: 20, border: `2px dashed ${t.border}`, background: t.card,
-            }}>
-              <p style={{ fontSize: 42, marginBottom: 14 }}>✈️</p>
-              <p style={{ fontSize: 18, fontWeight: 700, color: t.textPrimary, marginBottom: 6, fontFamily: 'Manrope, sans-serif' }}>No trips logged yet</p>
-              <p style={{ fontSize: 13, color: t.textMuted, marginBottom: 24, fontFamily: 'Manrope, sans-serif' }}>Start building your travel journal</p>
-              <button
-                onClick={openNew}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 8,
-                  padding: '12px 24px', borderRadius: 12,
-                  background: t.primary, color: isDark ? '#001e3c' : '#fff',
-                  fontWeight: 700, fontSize: 14,
-                  fontFamily: 'Manrope, sans-serif', cursor: 'pointer', border: 'none',
-                }}
-              ><PlusIcon /> Log First Trip</button>
-            </div>
-
-          ) : (
-            /* ── Winding path timeline ── */
-            <div style={{ maxWidth: 820, margin: '0 auto', position: 'relative' }}>
-
-              {/* decorative winding SVG path */}
-              <svg
-                style={{
-                  position: 'absolute', top: 0, left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '100%', height: '100%',
-                  pointerEvents: 'none', opacity: 0.18,
-                }}
-                preserveAspectRatio="none"
-                viewBox="0 0 100 1000"
-              >
-                <path
-                  d="M50,0 Q80,100 50,200 T50,400 T30,600 T70,800 T50,1000"
-                  fill="none"
-                  stroke={pathColor}
-                  strokeDasharray="8 8"
-                  strokeWidth="2"
-                />
-              </svg>
-
-              {grouped.map(([month, monthTrips]) => (
-                <div key={month} style={{ marginBottom: 48 }}>
-
-                  {/* Month pill */}
-                  <div style={{ position: 'relative', zIndex: 2, marginBottom: 28 }}>
-                    <div style={{
-                      display: 'inline-block',
-                      background: t.surface, padding: '5px 16px', borderRadius: 999,
-                      border: `1px solid ${t.border}`,
-                      boxShadow: isDark ? '0 4px 12px rgba(0,0,0,0.3)' : '0 4px 12px rgba(28,28,17,0.06)',
-                    }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 800, letterSpacing: '3px',
-                        textTransform: 'uppercase', color: t.primary,
-                        fontFamily: 'Manrope, sans-serif',
-                      }}>{month}</span>
-                    </div>
-                  </div>
-
-                  {/* Trip rows */}
-                  {monthTrips.map((trip) => {
-                    const goLeft = trip._globalIdx % 2 === 0
-
-                    return (
-                      <div
-                        key={trip.id}
-                        style={{
-                          position: 'relative', zIndex: 2,
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 56px 1fr',
-                          alignItems: 'center',
-                          gap: '0 16px',
-                          marginBottom: 40,
-                        }}
-                      >
-                        {/* LEFT slot */}
-                        <div style={{ gridColumn: 1 }}>
-                          {goLeft && (
-                            <TripCard
-                              trip={trip}
-                              tripNumber={trip._globalIdx + 1}
-                              onEdit={openEdit}
-                              onDelete={handleDelete}
-                              t={t}
-                              isDark={isDark}
-                            />
-                          )}
-                        </div>
-
-                        {/* CENTRE — flag node on every trip */}
-                        <div style={{
-                          gridColumn: 2,
-                          display: 'flex', flexDirection: 'column', alignItems: 'center',
-                          position: 'relative',
-                        }}>
-                          <div style={{ position: 'relative' }}>
-                            <div style={{
-                              position: 'absolute', inset: 0, borderRadius: '50%',
-                              border: `2px solid ${nodeDotActive}`,
-                              animation: 'tl-ping 2s cubic-bezier(0,0,0.2,1) infinite',
-                            }} />
-                            <div style={{
-                              width: 46, height: 46, borderRadius: '50%',
-                              background: nodeDotActive, color: nodeFg,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              boxShadow: `0 0 0 5px ${t.primaryFaded}, 0 0 20px ${t.primaryFaded}`,
-                              position: 'relative', zIndex: 1,
-                            }}>
-                              <FlagIcon />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* RIGHT slot */}
-                        <div style={{ gridColumn: 3 }}>
-                          {!goLeft && (
-                            <TripCard
-                              trip={trip}
-                              tripNumber={trip._globalIdx + 1}
-                              onEdit={openEdit}
-                              onDelete={handleDelete}
-                              t={t}
-                              isDark={isDark}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
+          {/* ── 4 Stat Cards — flat, color-coded bottom border ──────────── */}
+          <section style={{
+            display: 'grid', gridTemplateColumns: 'repeat(4,1fr)',
+            gap: 18, marginBottom: 36,
+            animation: 'ins-fade 0.45s 0.08s ease both',
+          }}>
+            {statCards.map((card) => (
+              <div key={card.label} className="ins-hover" style={{
+                background: t.cardLow,
+                borderRadius: 16,
+                padding: '28px 24px 24px',
+                border: `1px solid ${t.border}`,
+                borderBottom: `4px solid ${card.s.border}`,
+                boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 12px 32px rgba(28,28,17,0.07)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                minHeight: 180,
+              }}>
+                {/* top: icon + badge */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 10,
+                    background: card.s.iconBg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+                  }}>{card.icon}</div>
+                  <span style={{
+                    fontSize: 9, fontWeight: 800, letterSpacing: '1.2px', textTransform: 'uppercase',
+                    color: card.s.badge,
+                    background: `${card.s.border}12`,
+                    border: `1px solid ${card.s.border}25`,
+                    padding: '3px 9px', borderRadius: 999,
+                  }}>{card.badge}</span>
                 </div>
-              ))}
+                {/* bottom: label + value */}
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: t.textMuted, margin: '0 0 6px' }}>
+                    {card.label}
+                  </p>
+                  <p style={{ fontSize: 32, fontWeight: 900, color: t.textPrimary, margin: 0, letterSpacing: '-1px', fontFamily: 'Lora, serif', lineHeight: 1 }}>
+                    {card.value}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </section>
+
+          {/* ── Personality Hero + Vibe ──────────────────────────────────── */}
+          <section style={{
+            display: 'grid', gridTemplateColumns: '2fr 1fr',
+            gap: 20, marginBottom: 36,
+            animation: 'ins-fade 0.45s 0.16s ease both',
+          }}>
+            {/* Personality card */}
+            <div style={{
+              borderRadius: 20,
+              background: t.heroBg,
+              overflow: 'hidden', position: 'relative',
+              minHeight: 380, padding: '48px',
+              display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+              boxShadow: isDark ? '0 12px 40px rgba(0,0,0,0.5)' : '0 12px 40px rgba(0,52,97,0.18)',
+            }}>
+              {/* crosshatch texture overlay */}
+              <div style={{
+                position: 'absolute', inset: 0, zIndex: 0, opacity: 0.5,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E")`,
+              }} />
+              {/* gradient overlay */}
+              <div style={{
+                position: 'absolute', inset: 0, zIndex: 1,
+                background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.15) 55%, transparent 100%)',
+              }} />
+              <div style={{ position: 'relative', zIndex: 2 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+                  <span style={{ fontSize: 42 }}>{meta.emoji}</span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 800, letterSpacing: '2.5px', textTransform: 'uppercase',
+                    color: t.heroSubText,
+                  }}>{meta.archetype}</span>
+                </div>
+                <h2 style={{
+                  fontSize: 'clamp(32px,4vw,54px)', fontWeight: 700,
+                  fontFamily: 'Lora, serif', fontStyle: 'italic',
+                  color: '#fff', margin: '0 0 16px', letterSpacing: '-1px', lineHeight: 1.1,
+                }}>{insights.travel_personality}</h2>
+                <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.72)', maxWidth: 480, lineHeight: 1.8, margin: 0 }}>
+                  {meta.desc}
+                </p>
+              </div>
             </div>
+
+            {/* Vibe card */}
+            <div style={{
+              borderRadius: 20,
+              background: t.cardHighest,
+              border: `1px solid ${t.border}`,
+              padding: '36px 28px',
+              display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+              boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(28,28,17,0.06)',
+            }}>
+              <div>
+                <div style={{
+                  width: 60, height: 60, borderRadius: '50%',
+                  background: t.card, border: `1px solid ${t.border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 28, marginBottom: 18,
+                  boxShadow: isDark ? '0 2px 12px rgba(0,0,0,0.4)' : '0 2px 12px rgba(28,28,17,0.08)',
+                }}>
+                  {getPrefIcon(insights.travel_preference)}
+                </div>
+                <h3 style={{
+                  fontSize: 26, fontWeight: 800, color: t.primary,
+                  margin: '0 0 10px', fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.5px',
+                }}>{insights.travel_preference || 'Explorer'}</h3>
+                <p style={{ fontSize: 13, color: t.textSecond, lineHeight: 1.7, margin: 0 }}>
+                  Your most common travel style. Your core vibe defines every journey.
+                </p>
+              </div>
+              {/* affinity bar */}
+              <div style={{ marginTop: 28 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1.5px', textTransform: 'uppercase', color: t.accent }}>
+                    Style Affinity
+                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: t.accent }}>
+                    {utilPct >= 80 ? '92%' : utilPct >= 50 ? '74%' : '58%'}
+                  </span>
+                </div>
+                <div style={{ height: 8, borderRadius: 4, background: t.progressBg, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 4,
+                    width: utilPct >= 80 ? '92%' : utilPct >= 50 ? '74%' : '58%',
+                    background: t.accent,
+                    transition: 'width 1s cubic-bezier(.4,0,.2,1)',
+                  }} />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ── Journal Highlights + Budget Utilization ──────────────────── */}
+          <section style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr',
+            gap: 36, marginBottom: 36,
+            animation: 'ins-fade 0.45s 0.24s ease both',
+          }}>
+
+            {/* Journal Highlights table */}
+            <div>
+              <h3 style={{
+                fontSize: 24, fontWeight: 900, color: t.primary,
+                letterSpacing: '-0.5px', margin: '0 0 20px',
+                display: 'flex', alignItems: 'center', gap: 10,
+                fontFamily: 'Manrope, sans-serif',
+              }}>
+                <span>📋</span> Journal Highlights
+              </h3>
+              <div style={{
+                borderRadius: 16, overflow: 'hidden',
+                background: t.cardLow, border: `1px solid ${t.border}`,
+                boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.2)' : '0 12px 32px rgba(28,28,17,0.06)',
+              }}>
+                {[
+                  { label: 'Most Visited', value: insights.most_visited_destination || 'N/A' },
+                  { label: 'Favorite Type', value: insights.favorite_place_category || 'N/A' },
+                  { label: 'Avg Trip Cost', value: `₹${fmt(insights.average_trip_cost)}` },
+                ].map((row, i) => (
+                  <div key={row.label} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '22px 28px',
+                    borderBottom: i < 2 ? `1px solid ${t.border}` : 'none',
+                  }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: t.textMuted }}>
+                      {row.label}
+                    </span>
+                    <span style={{ fontSize: 18, fontWeight: 800, color: t.primary, fontFamily: 'Manrope, sans-serif' }}>
+                      {row.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Budget Utilization */}
+            <div>
+              <h3 style={{
+                fontSize: 24, fontWeight: 900, color: t.primary,
+                letterSpacing: '-0.5px', margin: '0 0 20px',
+                display: 'flex', alignItems: 'center', gap: 10,
+                fontFamily: 'Manrope, sans-serif',
+              }}>
+                <span>💰</span> Budget Utilization
+              </h3>
+              <div style={{
+                borderRadius: 16,
+                background: t.cardLow, border: `1px solid ${t.border}`,
+                padding: '28px 28px 24px',
+                boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.2)' : '0 12px 32px rgba(28,28,17,0.06)',
+              }}>
+                {/* totals row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28 }}>
+                  <div>
+                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: t.textMuted, margin: '0 0 6px' }}>
+                      Annual Budget
+                    </p>
+                    <p style={{ fontSize: 28, fontWeight: 900, color: t.textPrimary, margin: 0, fontFamily: 'Lora, serif', lineHeight: 1 }}>
+                      ₹{fmt(ba.total_budget)}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: t.textMuted, margin: '0 0 6px' }}>
+                      {isOver ? 'Overspent' : 'Remaining'}
+                    </p>
+                    <p style={{
+                      fontSize: 28, fontWeight: 900, margin: 0, fontFamily: 'Lora, serif', lineHeight: 1,
+                      color: isOver ? '#ef4444' : t.accent,
+                    }}>
+                      ₹{isOver
+                        ? fmt(ba.overspend)
+                        : fmt(Math.max(0, (ba.total_budget || 0) - (ba.total_spent || 0)))}
+                    </p>
+                  </div>
+                </div>
+
+                {/* header row for bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{
+                    fontSize: 9, fontWeight: 800, letterSpacing: '1.5px', textTransform: 'uppercase',
+                    padding: '3px 10px', borderRadius: 999,
+                    background: t.primaryFixed, color: t.primary,
+                  }}>Expenses</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: isOver ? '#ef4444' : t.primary }}>
+                    {ba.budget_utilization}% Used
+                  </span>
+                </div>
+
+                {/* segmented bar */}
+                <div style={{ height: 14, borderRadius: 7, overflow: 'hidden', background: t.progressBg, display: 'flex', marginBottom: 12 }}>
+                  <div style={{ width: `${staysPct}%`, background: t.progressP, transition: 'width 1.1s cubic-bezier(.4,0,.2,1)' }} />
+                  <div style={{ width: `${flightsPct}%`, background: t.progressA, transition: 'width 1.1s cubic-bezier(.4,0,.2,1)' }} />
+                  <div style={{ width: `${diningPct}%`, background: t.progressT, transition: 'width 1.1s cubic-bezier(.4,0,.2,1)' }} />
+                </div>
+
+                {/* legend */}
+                <div style={{ display: 'flex', gap: 18 }}>
+                  {[
+                    { label: 'Stays', color: t.progressP },
+                    { label: 'Flights', color: t.progressA },
+                    { label: 'Dining', color: t.progressT },
+                  ].map(item => (
+                    <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: t.textMuted }}>
+                        {item.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {isOver && (
+                  <div style={{
+                    marginTop: 16, padding: '10px 14px', borderRadius: 10,
+                    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                    fontSize: 12, color: '#ef4444',
+                  }}>⚠️ Overspent by ₹{fmt(ba.overspend)}</div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* ── Destination Tag Cloud ────────────────────────────────────── */}
+          {insights.destination_breakdown && Object.keys(insights.destination_breakdown).length > 0 && (
+            <section style={{ marginBottom: 36, animation: 'ins-fade 0.45s 0.32s ease both' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
+                <h3 style={{
+                  fontSize: 26, fontWeight: 900, color: t.primary,
+                  letterSpacing: '-0.5px', margin: 0, fontFamily: 'Manrope, sans-serif',
+                }}>Map of Memories</h3>
+                <span style={{ fontSize: 13, color: t.textMuted }}>
+                  {Object.keys(insights.destination_breakdown).length} destinations visited
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                {Object.entries(insights.destination_breakdown).map(([dest, count], i) => {
+                  const c = DEST_COLORS[i % DEST_COLORS.length]
+                  return (
+                    <div
+                      key={dest}
+                      className="ins-tag"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '12px 22px', borderRadius: 999,
+                        background: isDark ? t.cardHigh : t.cardHighest,
+                        border: `1px solid ${t.border}`,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = c }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = t.border }}
+                    >
+                      <span style={{ fontSize: 14, fontWeight: 700, color: t.primary }}>{dest}</span>
+                      <span style={{ width: 4, height: 4, borderRadius: '50%', background: t.textMuted, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: t.textMuted }}>{count} visit{count > 1 ? 's' : ''}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
           )}
+
+          {/* ── CTA Banner ──────────────────────────────────────────────── */}
+          <section style={{
+            borderRadius: 24,
+            background: t.cardHighest,
+            border: `1px solid ${isDark ? t.border : 'rgba(0,52,97,0.06)'}`,
+            padding: '48px',
+            position: 'relative', overflow: 'hidden',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            flexWrap: 'wrap', gap: 24,
+            boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(28,28,17,0.06)',
+            animation: 'ins-fade 0.45s 0.4s ease both',
+          }}>
+            {/* decorative blob */}
+            <div style={{
+              position: 'absolute', bottom: -80, right: -80,
+              width: 320, height: 320, borderRadius: '50%',
+              background: isDark ? 'rgba(163,201,255,0.04)' : 'rgba(0,52,97,0.05)',
+              pointerEvents: 'none',
+            }} />
+
+            <div style={{ position: 'relative', zIndex: 1, maxWidth: 500 }}>
+              <h3 style={{
+                fontSize: 32, fontWeight: 900, color: t.primary,
+                letterSpacing: '-1px', margin: '0 0 12px', fontFamily: 'Manrope, sans-serif',
+              }}>Want deeper insights?</h3>
+              <p style={{ fontSize: 15, color: t.textSecond, lineHeight: 1.7, margin: '0 0 24px' }}>
+                Unlock full route breakdowns, spending trends, behaviour analysis and forecasts for your next trip.
+              </p>
+              <button
+                className="ins-btn"
+                onClick={() => navigate('/analytics')}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 10,
+                  padding: '14px 28px', borderRadius: 12, border: 'none',
+                  background: t.primary, color: isDark ? '#001e3c' : '#fff',
+                  fontSize: 14, fontWeight: 700, fontFamily: 'Manrope, sans-serif',
+                  boxShadow: `0 6px 20px ${isDark ? 'rgba(163,201,255,0.2)' : 'rgba(0,52,97,0.2)'}`,
+                }}
+              >
+                View Full Analytics <ArrowIcon />
+              </button>
+            </div>
+
+            {/* rotated decorative map tile */}
+            <div style={{
+              position: 'relative', zIndex: 1, flexShrink: 0,
+              width: 200, height: 200, borderRadius: 20,
+              overflow: 'hidden',
+              transform: 'rotate(3deg)',
+              boxShadow: isDark ? '0 20px 60px rgba(0,0,0,0.6)' : '0 20px 60px rgba(28,28,17,0.15)',
+              background: isDark
+                ? 'linear-gradient(135deg,#1a1a1a,#2a2a2a)'
+                : 'linear-gradient(135deg,#f1eedb,#e6e3d0)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 72,
+            }}>🗺️</div>
+          </section>
+
         </div>
       </div>
-
-      {/* ── Modal ── */}
-      {showForm && (
-        <TripModal title={editing ? 'Edit Trip' : 'Log New Trip'} onClose={closeForm} t={t} isDark={isDark}>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-            <div>
-              <FieldLabel t={t}>Trip Name</FieldLabel>
-              <TlInput t={t} placeholder="e.g. Monsoon Escape to Coorg" required {...f('trip_name')} />
-            </div>
-
-            <div>
-              <FieldLabel t={t}>Destination</FieldLabel>
-              <TlInput t={t} placeholder="e.g. Coorg, Karnataka" required {...f('destination')} />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <FieldLabel t={t}>Start Date</FieldLabel>
-                <TlInput t={t} type="date" required {...f('start_date')} />
-              </div>
-              <div>
-                <FieldLabel t={t}>End Date</FieldLabel>
-                <TlInput t={t} type="date" required min={form.start_date} {...f('end_date')} />
-              </div>
-            </div>
-
-            <div>
-              <FieldLabel t={t}>Budget (₹)</FieldLabel>
-              <TlInput t={t} type="number" min="0" step="0.01" placeholder="e.g. 25000" required {...f('budget')} />
-            </div>
-
-            <div>
-              <FieldLabel t={t}>Travel Type</FieldLabel>
-              <TlSelect t={t} required {...f('travel_type')}>
-                {['Solo', 'Family', 'Friends'].map(v => <option key={v} value={v}>{v}</option>)}
-              </TlSelect>
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-              <button
-                type="submit"
-                style={{
-                  flex: 1, padding: 13,
-                  background: t.primary, color: isDark ? '#001e3c' : '#fff',
-                  border: 'none', borderRadius: 12, cursor: 'pointer',
-                  fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 700,
-                  transition: 'opacity 0.18s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = '.85' }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-              >{editing ? 'Save Changes' : 'Log Trip'}</button>
-
-              <button
-                type="button"
-                onClick={closeForm}
-                style={{
-                  flex: 1, padding: 13,
-                  background: t.surface, border: `1px solid ${t.border}`,
-                  color: t.textSecond, borderRadius: 12, cursor: 'pointer',
-                  fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 600,
-                  transition: 'background 0.18s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = t.card }}
-                onMouseLeave={e => { e.currentTarget.style.background = t.surface }}
-              >Cancel</button>
-            </div>
-          </form>
-        </TripModal>
-      )}
     </>
   )
 }
