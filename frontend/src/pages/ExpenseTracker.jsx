@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../utils/axios'
 import { useTheme } from '../design/Themecontext'
 import { Spinner, EmptyState } from '../design/UI'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { createPortal } from 'react-dom'
 
-// ─── Theme tokens (same pattern as TripLogger) ────────────────────────────────
+// ─── Theme tokens ─────────────────────────────────────────────────────────────
 const themes = {
   light: {
     bg: '#fdfae7',
@@ -26,7 +27,6 @@ const themes = {
     accentFaded: '#1b6d2418',
     tertiary: '#611a07',
     progressBg: '#e6e3d0',
-    // stat card first is gradient, rest are flat
     s1grad: 'linear-gradient(135deg,#003461,#004b87)',
     sFlat: '#e6e3d0',
   },
@@ -106,6 +106,29 @@ const ChevronIcon = () => (
   </svg>
 )
 
+// ─── Portal Dropdown ──────────────────────────────────────────────────────────
+function PortalDropdown({ anchorRef, open, children }) {
+  const [style, setStyle] = useState({})
+
+  useEffect(() => {
+    if (!open || !anchorRef.current) return
+    const rect = anchorRef.current.getBoundingClientRect()
+    setStyle({
+      position: 'fixed',
+      top: rect.bottom + 6,
+      left: rect.left,
+      minWidth: rect.width,
+      zIndex: 99999,
+    })
+  }, [open, anchorRef])
+
+  if (!open) return null
+  return createPortal(
+    <div style={style}>{children}</div>,
+    document.body
+  )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ExpenseTracker() {
   const { dark: ctxDark } = useTheme()
@@ -122,6 +145,7 @@ export default function ExpenseTracker() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(defaultForm)
   const [tripDropOpen, setTripDropOpen] = useState(false)
+  const dropdownAnchorRef = useRef(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -228,6 +252,7 @@ export default function ExpenseTracker() {
           <header style={{
             display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-end',
             gap: 16, marginBottom: 36, animation: 'et-fade 0.45s ease both',
+            position: 'relative', zIndex: 100,
           }}>
             <div>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase', color: t.accent, margin: '0 0 10px' }}>
@@ -240,14 +265,14 @@ export default function ExpenseTracker() {
             </div>
 
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              {/* Trip selector dropdown */}
-              <div data-trip-dropdown style={{ position: 'relative', zIndex: 10 }}>
+              {/* Trip selector dropdown — anchor ref for portal positioning */}
+              <div data-trip-dropdown style={{ position: 'relative' }} ref={dropdownAnchorRef}>
                 <button
                   onClick={() => setTripDropOpen(o => !o)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '11px 16px', borderRadius: 12,
-                    background: isDark ? t.cardHigh : t.cardHigh,
+                    background: t.cardHigh,
                     border: `1px solid ${t.border}`,
                     color: t.textSecond, fontSize: 13, fontWeight: 600,
                     cursor: 'pointer', fontFamily: 'Manrope, sans-serif',
@@ -260,26 +285,36 @@ export default function ExpenseTracker() {
                   <span style={{ color: t.textPrimary, fontWeight: 700 }}>
                     {selectedTripObj ? selectedTripObj.trip_name : 'Select Trip'}
                   </span>
-                  <ChevronIcon />
+                  <span style={{ display: 'inline-flex', transform: tripDropOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <ChevronIcon />
+                  </span>
                 </button>
-                {tripDropOpen && (
-                  <div style={{
-                    position: 'absolute', top: '110%', left: 0, zIndex: 9999,
-                    background: isDark ? t.card : '#fff',
-                    border: `1px solid ${t.border}`,
-                    borderRadius: 14, minWidth: 260,
-                    boxShadow: isDark ? '0 24px 60px rgba(0,0,0,0.7)' : '0 24px 60px rgba(28,28,17,0.18)',
-                    overflow: 'hidden',
-                  }}>
+
+                {/* Portal-rendered dropdown — always on top of everything */}
+                <PortalDropdown anchorRef={dropdownAnchorRef} open={tripDropOpen}>
+                  <div
+                    data-trip-dropdown
+                    style={{
+                      background: isDark ? t.card : '#fff',
+                      border: `1px solid ${t.border}`,
+                      borderRadius: 14, minWidth: 280,
+                      boxShadow: isDark ? '0 24px 60px rgba(0,0,0,0.7)' : '0 24px 60px rgba(28,28,17,0.18)',
+                      overflow: 'hidden',
+                    }}
+                  >
                     {trips.map(tr => (
-                      <button key={tr.id} onClick={() => { setSelectedTrip(tr.id); setTripDropOpen(false) }} style={{
-                        width: '100%', textAlign: 'left', padding: '13px 18px',
-                        background: String(tr.id) === String(selectedTrip) ? t.primaryFaded : 'transparent',
-                        border: 'none', borderBottom: `1px solid ${t.border}`, cursor: 'pointer',
-                        fontSize: 13, fontWeight: 600, color: String(tr.id) === String(selectedTrip) ? t.primary : t.textSecond,
-                        fontFamily: 'Manrope, sans-serif',
-                        transition: 'background 0.15s',
-                      }}
+                      <button
+                        key={tr.id}
+                        onClick={() => { setSelectedTrip(tr.id); setTripDropOpen(false) }}
+                        style={{
+                          width: '100%', textAlign: 'left', padding: '13px 18px',
+                          background: String(tr.id) === String(selectedTrip) ? t.primaryFaded : 'transparent',
+                          border: 'none', borderBottom: `1px solid ${t.border}`, cursor: 'pointer',
+                          fontSize: 13, fontWeight: 600,
+                          color: String(tr.id) === String(selectedTrip) ? t.primary : t.textSecond,
+                          fontFamily: 'Manrope, sans-serif',
+                          transition: 'background 0.15s',
+                        }}
                         onMouseEnter={e => { if (String(tr.id) !== String(selectedTrip)) e.currentTarget.style.background = isDark ? t.cardHigh : t.cardLow }}
                         onMouseLeave={e => { if (String(tr.id) !== String(selectedTrip)) e.currentTarget.style.background = 'transparent' }}
                       >
@@ -287,7 +322,7 @@ export default function ExpenseTracker() {
                       </button>
                     ))}
                   </div>
-                )}
+                </PortalDropdown>
               </div>
 
               {/* Add Expense button */}
@@ -311,7 +346,7 @@ export default function ExpenseTracker() {
 
           {selectedTrip && summary && (
             <>
-              {/* ── Stat Cards — bento style from HTML ── */}
+              {/* ── Stat Cards ── */}
               <section style={{
                 display: 'grid', gridTemplateColumns: 'repeat(4,1fr)',
                 gap: 16, marginBottom: 28,
@@ -339,10 +374,10 @@ export default function ExpenseTracker() {
                 </div>
 
                 {/* Top 3 categories — flat */}
-                {topCats.map((cat, i) => (
+                {topCats.map((cat) => (
                   <div key={cat.name} className="et-hover" style={{
                     borderRadius: 16, padding: '24px',
-                    background: isDark ? t.cardLow : t.cardLow,
+                    background: t.cardLow,
                     border: `1px solid ${t.border}`,
                     boxShadow: isDark ? '0 4px 16px rgba(0,0,0,0.2)' : '0 4px 16px rgba(28,28,17,0.06)',
                   }}>
@@ -366,7 +401,7 @@ export default function ExpenseTracker() {
                 ))}
               </section>
 
-              {/* ── Bento: Distribution (5col) + Expense List (7col) ── */}
+              {/* ── Bento: Distribution + Expense List ── */}
               <section style={{
                 display: 'grid', gridTemplateColumns: '5fr 7fr',
                 gap: 20, marginBottom: 28,
@@ -473,16 +508,13 @@ export default function ExpenseTracker() {
                         return (
                           <div key={exp.id} className="et-row" style={{
                             borderRadius: 16, padding: '18px 20px',
-                            background: isDark
-                              ? 'rgba(31,31,31,0.6)'
-                              : 'rgba(255,255,255,0.7)',
+                            background: isDark ? 'rgba(31,31,31,0.6)' : 'rgba(255,255,255,0.7)',
                             backdropFilter: 'blur(12px)',
                             border: `1px solid ${t.border}`,
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             boxShadow: isDark ? '0 2px 12px rgba(0,0,0,0.2)' : '0 2px 12px rgba(28,28,17,0.05)',
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                              {/* icon */}
                               <div style={{
                                 width: 52, height: 52, borderRadius: 14, flexShrink: 0,
                                 background: `${catColor}15`,

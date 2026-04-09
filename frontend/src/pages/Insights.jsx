@@ -95,11 +95,10 @@ function getPrefIcon(pref) {
 const DEST_COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f97316', '#06b6d4', '#f59e0b']
 function fmt(n) { return Number(n || 0).toLocaleString('en-IN') }
 
-// ─── Wrapped slide definitions (data-driven, uses real insights) ──────────────
+// ─── Slide definitions ────────────────────────────────────────────────────────
 function buildSlides(insights, meta, isDark) {
   const ba = insights?.budget_analysis || {}
   const utilPct = Math.min(ba.budget_utilization ?? 0, 100)
-  const isOver = (ba.budget_utilization ?? 0) > 100
   const destinations = insights?.destination_breakdown
     ? Object.entries(insights.destination_breakdown)
     : []
@@ -315,7 +314,7 @@ function TravelWrapped({ insights, isDark, t, onViewDashboard, navigate }) {
   const slides = buildSlides(insights, meta, isDark)
   const total = slides.length
   const [current, setCurrent] = useState(0)
-  const [animDir, setAnimDir] = useState('next') // 'next' | 'prev'
+  const [animDir, setAnimDir] = useState('next')
   const [transitioning, setTransitioning] = useState(false)
   const touchStartX = useRef(null)
 
@@ -345,7 +344,6 @@ function TravelWrapped({ insights, isDark, t, onViewDashboard, navigate }) {
 
   return (
     <section style={{ marginBottom: 48 }}>
-      {/* Section label */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase', color: t.accent, margin: '0 0 6px' }}>
@@ -368,13 +366,9 @@ function TravelWrapped({ insights, isDark, t, onViewDashboard, navigate }) {
         </button>
       </div>
 
-      {/* Slide card */}
       <div
         style={{
-          borderRadius: 24,
-          overflow: 'hidden',
-          position: 'relative',
-          height: 500,
+          borderRadius: 24, overflow: 'hidden', position: 'relative', height: 500,
           background: slide.bg,
           boxShadow: isDark ? '0 20px 60px rgba(0,0,0,0.6)' : '0 20px 60px rgba(0,52,97,0.18)',
           cursor: current < total - 1 ? 'pointer' : 'default',
@@ -384,7 +378,6 @@ function TravelWrapped({ insights, isDark, t, onViewDashboard, navigate }) {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onClick={(e) => {
-          // click right side = next, left side = prev
           const rect = e.currentTarget.getBoundingClientRect()
           const x = e.clientX - rect.left
           if (x > rect.width * 0.3) next()
@@ -459,7 +452,7 @@ function TravelWrapped({ insights, isDark, t, onViewDashboard, navigate }) {
           )}
         </div>
 
-        {/* Prev / Next arrow buttons */}
+        {/* Prev / Next arrows */}
         {current > 0 && (
           <button
             onClick={e => { e.stopPropagation(); prev() }}
@@ -516,7 +509,7 @@ function TravelWrapped({ insights, isDark, t, onViewDashboard, navigate }) {
   )
 }
 
-// ─── Main Insights Component ──────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function Insights() {
   const { user } = useAuth()
   const { dark: ctxDark } = useTheme()
@@ -617,7 +610,7 @@ export default function Insights() {
 
         <div style={{ position: 'relative', zIndex: 1, maxWidth: 1080, margin: '0 auto', padding: '0 24px 100px' }}>
 
-          {/* ── Page Header ─────────────────────────────────────────────── */}
+          {/* ── Page Header ── */}
           <header style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
             flexWrap: 'wrap', gap: 16, margin: '48px 0 36px',
@@ -636,18 +629,9 @@ export default function Insights() {
                 Your personalized travel insights for {new Date().getFullYear()}
               </p>
             </div>
+
+            {/* Only the Analytics button remains */}
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button className="ins-btn" style={{
-                padding: '11px 22px', borderRadius: 12,
-                background: t.cardHigh, border: `1px solid ${t.border}`,
-                color: t.primary, fontWeight: 700, fontSize: 13, fontFamily: 'Manrope, sans-serif',
-              }}>Share Report</button>
-              <button className="ins-btn" style={{
-                padding: '11px 22px', borderRadius: 12,
-                background: t.primary, border: 'none',
-                color: isDark ? '#001e3c' : '#fff',
-                fontWeight: 700, fontSize: 13, fontFamily: 'Manrope, sans-serif',
-              }}>Export PDF</button>
               <button
                 className="ins-btn"
                 onClick={() => navigate('/analytics')}
@@ -666,7 +650,7 @@ export default function Insights() {
             </div>
           </header>
 
-          {/* ── Travel Wrapped Slides ────────────────────────────────────── */}
+          {/* ── Travel Wrapped Slides ── */}
           <div style={{ animation: 'ins-fade 0.45s 0.06s ease both' }}>
             <TravelWrapped
               insights={insights}
@@ -677,10 +661,10 @@ export default function Insights() {
             />
           </div>
 
-          {/* ── Dashboard anchor ─────────────────────────────────────────── */}
+          {/* ── Dashboard anchor ── */}
           <div ref={dashboardRef} style={{ scrollMarginTop: 80 }} />
 
-          {/* ── Dashboard label ──────────────────────────────────────────── */}
+          {/* ── Dashboard label ── */}
           <div style={{ marginBottom: 28, animation: 'ins-fade 0.45s 0.12s ease both' }}>
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase', color: t.accent, margin: '0 0 6px' }}>
               Full Dashboard
@@ -690,7 +674,7 @@ export default function Insights() {
             </h2>
           </div>
 
-          {/* ── 4 Stat Cards ─────────────────────────────────────────────── */}
+          {/* ── 4 Stat Cards ── */}
           <section style={{
             display: 'grid', gridTemplateColumns: 'repeat(4,1fr)',
             gap: 18, marginBottom: 36,
@@ -733,7 +717,7 @@ export default function Insights() {
             ))}
           </section>
 
-          {/* ── Personality Hero + Vibe ──────────────────────────────────── */}
+          {/* ── Personality Hero + Vibe ── */}
           <section style={{
             display: 'grid', gridTemplateColumns: '2fr 1fr',
             gap: 20, marginBottom: 36,
@@ -741,9 +725,7 @@ export default function Insights() {
           }}>
             {/* Personality card */}
             <div style={{
-              borderRadius: 20,
-              background: t.heroBg,
-              overflow: 'hidden', position: 'relative',
+              borderRadius: 20, background: t.heroBg, overflow: 'hidden', position: 'relative',
               minHeight: 380, padding: '48px',
               display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
               boxShadow: isDark ? '0 12px 40px rgba(0,0,0,0.5)' : '0 12px 40px rgba(0,52,97,0.18)',
@@ -774,9 +756,7 @@ export default function Insights() {
 
             {/* Vibe card */}
             <div style={{
-              borderRadius: 20,
-              background: t.cardHighest,
-              border: `1px solid ${t.border}`,
+              borderRadius: 20, background: t.cardHighest, border: `1px solid ${t.border}`,
               padding: '36px 28px',
               display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
               boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(28,28,17,0.06)',
@@ -817,7 +797,7 @@ export default function Insights() {
             </div>
           </section>
 
-          {/* ── Journal Highlights + Budget Utilization ──────────────────── */}
+          {/* ── Journal Highlights + Budget Utilization ── */}
           <section style={{
             display: 'grid', gridTemplateColumns: '1fr 1fr',
             gap: 36, marginBottom: 36,
@@ -888,7 +868,7 @@ export default function Insights() {
             </div>
           </section>
 
-          {/* ── Destination Tag Cloud ────────────────────────────────────── */}
+          {/* ── Destination Tag Cloud ── */}
           {insights.destination_breakdown && Object.keys(insights.destination_breakdown).length > 0 && (
             <section style={{ marginBottom: 36, animation: 'ins-fade 0.45s 0.4s ease both' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
@@ -916,7 +896,7 @@ export default function Insights() {
             </section>
           )}
 
-          {/* ── CTA Banner ──────────────────────────────────────────────── */}
+          {/* ── CTA Banner ── */}
           <section style={{
             borderRadius: 24,
             background: t.cardHighest,
