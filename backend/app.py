@@ -39,7 +39,7 @@ def create_app():
     from routes.insights import insights_bp
     from routes.recommendations import recommendations_bp
     from routes.analytics import analytics_bp
-    from routes.gemini import gemini_bp  # ✅ ADDED
+    from routes.groq import gemini_bp  # ✅ UPDATED: renamed from gemini to groq
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(trips_bp, url_prefix='/api')

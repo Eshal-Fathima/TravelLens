@@ -12,9 +12,8 @@ import requests
 recommendations_bp = Blueprint('recommendations', __name__)
 
 # ─── Groq config ──────────────────────────────────────────────────────────────
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL   = "llama3-70b-8192"
+GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODEL = "llama3-70b-8192"
 
 # ─── Status ───────────────────────────────────────────────────────────────────
 @recommendations_bp.route('/recommendations/status', methods=['GET'])
@@ -24,31 +23,29 @@ def status():
 
 # ─── Groq helper ──────────────────────────────────────────────────────────────
 def call_groq(prompt: str) -> dict | None:
-    """
-    Send prompt to Groq and return parsed JSON dict,
-    or None if the call fails.
-    """
+    GROQ_API_KEY = os.environ.get("GROQ_API_KEY")  # ✅ read after load_dotenv()
+
     if not GROQ_API_KEY:
+        print("❌ GROQ_API_KEY is missing or empty!")
         return None
+
+    print(f"✅ GROQ_API_KEY found: {GROQ_API_KEY[:8]}...")
 
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type":  "application/json",
     }
 
-    # A small random seed injected into the system prompt forces the model to
-    # produce a fresh response on every call even when the user data is identical.
     seed = random.randint(100_000, 999_999)
-
     system_msg = (
         "You are an expert travel advisor. "
         "Always respond ONLY with valid JSON — no markdown, no code fences, no prose. "
-        f"Session-seed: {seed}"          # makes every response unique
+        f"Session-seed: {seed}"
     )
 
     payload = {
         "model":       GROQ_MODEL,
-        "temperature": 0.9,              # higher = more varied output
+        "temperature": 0.9,
         "max_tokens":  2000,
         "messages": [
             {"role": "system", "content": system_msg},
@@ -57,30 +54,36 @@ def call_groq(prompt: str) -> dict | None:
     }
 
     try:
+        print("🔄 Calling Groq API...")
         resp = requests.post(GROQ_URL, headers=headers, json=payload, timeout=30)
+        print(f"📡 Groq response status: {resp.status_code}")
+
         resp.raise_for_status()
         raw = resp.json()["choices"][0]["message"]["content"].strip()
+        print(f"📦 Groq raw response (first 200 chars): {raw[:200]}")
 
-        # Strip accidental markdown fences just in case
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
                 raw = raw[4:]
-        return json.loads(raw)
 
+        parsed = json.loads(raw)
+        print("✅ Groq JSON parsed successfully!")
+        return parsed
+
+    except requests.exceptions.HTTPError as e:
+        print(f"❌ Groq HTTP error: {e.response.status_code} - {e.response.text}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"❌ Groq JSON parse failed: {e} | raw was: {raw[:300]}")
+        return None
     except Exception as exc:
-        print(f"[Groq Error] {exc}")
+        print(f"❌ Groq unexpected error: {exc}")
         return None
 
 
 # ─── Prompt builder ───────────────────────────────────────────────────────────
 def build_prompt(trips: list, expenses: list) -> str:
-    """
-    Serialise the user's real trip history + spending into a rich prompt so
-    every new trip/expense leads to a genuinely different recommendation.
-    """
-
-    # ── Trip summary ──
     if trips:
         trip_lines = []
         for t in trips:
@@ -90,8 +93,8 @@ def build_prompt(trips: list, expenses: list) -> str:
                 f"{duration} days | budget ₹{t.budget:,.0f} | "
                 f"from {t.start_date} to {t.end_date}"
             )
-        trips_text = "\n".join(trip_lines)
-        visited     = [t.destination for t in trips]
+        trips_text   = "\n".join(trip_lines)
+        visited      = [t.destination for t in trips]
         travel_types = list({t.travel_type for t in trips})
         total_budget = sum(t.budget for t in trips)
         avg_budget   = total_budget / len(trips)
@@ -101,7 +104,6 @@ def build_prompt(trips: list, expenses: list) -> str:
         travel_types = []
         avg_budget   = 0
 
-    # ── Expense summary ──
     if expenses:
         spending: dict[str, float] = {}
         for e in expenses:
@@ -132,7 +134,7 @@ Highest-spend category: {top_spend}
 Based on this profile, generate a FRESH and PERSONALISED travel recommendation.
 Do NOT repeat destinations the user has already visited.
 Tailor suggestions to their travel style ({", ".join(travel_types) if travel_types else "any"})
-and budget range (around ₹{avg_budget:,.0f} per trip).
+and budget range (around ₹{{avg_budget:,.0f}} per trip).
 
 Return STRICTLY the following JSON structure (no extra keys, no markdown):
 
@@ -185,33 +187,32 @@ def get_recommendations(user_id):
     try:
         current_user_id = int(get_jwt_identity())
 
-        # Security: users can only fetch their own recommendations
         if current_user_id != user_id:
             return jsonify({"error": "Unauthorised"}), 403
 
-        # ── Fetch user data ──
         trips    = Trip.query.filter_by(user_id=user_id).order_by(Trip.created_at.desc()).all()
         trip_ids = [t.id for t in trips]
         expenses = Expense.query.filter(Expense.trip_id.in_(trip_ids)).all() if trip_ids else []
 
-        # ── Call Groq ──
         prompt = build_prompt(trips, expenses)
         recs   = call_groq(prompt)
 
         if recs:
+            print("✅ Returning Groq API recommendations")
             return jsonify({"recommendations": recs}), 200
 
-        # ── Graceful fallback (Groq unavailable / key missing) ──
+        # ── Fallback ──
+        print("⚠️ Groq failed — returning fallback recommendations")
         visited = {t.destination for t in trips}
         fallback_destinations = [
             d for d in [
-                {"name": "Manali, India",       "category": "Mountain",    "description": "Scenic Himalayan escape perfect for adventure lovers."},
-                {"name": "Goa, India",           "category": "Beach",       "description": "Vibrant beaches and nightlife for group travellers."},
-                {"name": "Jaipur, India",        "category": "Historical",  "description": "Royal palaces and rich Rajasthani culture."},
-                {"name": "Coorg, India",         "category": "Nature",      "description": "Misty hills and coffee plantations for a peaceful retreat."},
-                {"name": "Andaman Islands",      "category": "Beach",       "description": "Crystal-clear waters ideal for snorkelling and diving."},
-                {"name": "Rishikesh, India",     "category": "Adventure",   "description": "White-water rafting and yoga capital of the world."},
-                {"name": "Varanasi, India",      "category": "Historical",  "description": "Ancient spiritual city on the banks of the Ganges."},
+                {"name": "Manali, India",      "category": "Mountain",   "description": "Scenic Himalayan escape perfect for adventure lovers."},
+                {"name": "Goa, India",          "category": "Beach",      "description": "Vibrant beaches and nightlife for group travellers."},
+                {"name": "Jaipur, India",       "category": "Historical", "description": "Royal palaces and rich Rajasthani culture."},
+                {"name": "Coorg, India",        "category": "Nature",     "description": "Misty hills and coffee plantations for a peaceful retreat."},
+                {"name": "Andaman Islands",     "category": "Beach",      "description": "Crystal-clear waters ideal for snorkelling and diving."},
+                {"name": "Rishikesh, India",    "category": "Adventure",  "description": "White-water rafting and yoga capital of the world."},
+                {"name": "Varanasi, India",     "category": "Historical", "description": "Ancient spiritual city on the banks of the Ganges."},
             ] if d["name"] not in visited
         ][:5]
 
@@ -219,12 +220,12 @@ def get_recommendations(user_id):
             "recommendations": {
                 "destinations": fallback_destinations,
                 "places": [
-                    {"name": "Taj Mahal",        "location": "Agra",     "description": "UNESCO World Heritage Site."},
-                    {"name": "Kerala Backwaters", "location": "Kerala",   "description": "Serene houseboat experience."},
-                    {"name": "Hampi Ruins",       "location": "Karnataka","description": "Stunning Vijayanagara Empire remains."},
-                    {"name": "Rann of Kutch",     "location": "Gujarat",  "description": "Spectacular salt desert, best at full moon."},
-                    {"name": "Spiti Valley",      "location": "Himachal", "description": "Remote high-altitude Buddhist landscape."},
-                    {"name": "Mysore Palace",     "location": "Mysore",   "description": "Magnificent Indo-Saracenic royal palace."},
+                    {"name": "Taj Mahal",         "location": "Agra",      "description": "UNESCO World Heritage Site."},
+                    {"name": "Kerala Backwaters",  "location": "Kerala",    "description": "Serene houseboat experience."},
+                    {"name": "Hampi Ruins",        "location": "Karnataka", "description": "Stunning Vijayanagara Empire remains."},
+                    {"name": "Rann of Kutch",      "location": "Gujarat",   "description": "Spectacular salt desert, best at full moon."},
+                    {"name": "Spiti Valley",       "location": "Himachal",  "description": "Remote high-altitude Buddhist landscape."},
+                    {"name": "Mysore Palace",      "location": "Mysore",    "description": "Magnificent Indo-Saracenic royal palace."},
                 ],
                 "budget_tips": [
                     {"category": "Transport", "tip": "Book train tickets on IRCTC 90 days in advance for Tatkal savings.", "savings": "₹1,000–₹3,000"},
@@ -237,4 +238,5 @@ def get_recommendations(user_id):
         }), 200
 
     except Exception as e:
+        print(f"❌ Recommendations endpoint error: {e}")
         return jsonify({"error": str(e)}), 500
