@@ -1,12 +1,12 @@
 import os
-from google import genai
+from groq import Groq
 from flask import Blueprint, request, jsonify
 
 # Create Blueprint
 gemini_bp = Blueprint('gemini', __name__)
 
-# Initialize Gemini client
-client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
+# Initialize Groq client
+client = Groq(api_key=os.getenv('GROQ_API_KEY'))
 
 
 # ---------------- TRIP IMAGE ---------------- #
@@ -27,14 +27,13 @@ def get_trip_image():
         Return ONLY the URL. No explanation.
         """
 
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[{"role": "user", "content": prompt}]
         )
 
-        image_url = (response.text or "").strip()
+        image_url = (response.choices[0].message.content or "").strip()
 
-        # ✅ FIXED fallback
         if not image_url.startswith("http"):
             keywords = destination.lower().replace(",", "").replace(" ", ",")
             image_url = f"https://source.unsplash.com/800x600/?{keywords},travel,landscape"
@@ -47,8 +46,6 @@ def get_trip_image():
     except Exception as e:
         data = request.get_json(silent=True) or {}
         dest = data.get("destination", "travel")
-
-        # ✅ FIXED HERE ALSO
         keywords = dest.lower().replace(",", "").replace(" ", ",")
 
         return jsonify({
@@ -72,12 +69,12 @@ def get_trip_description():
         Return ONLY the sentence without quotes or punctuation at the end.
         """
 
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[{"role": "user", "content": prompt}]
         )
 
-        description = (response.text or "").strip().strip('"').strip("'")
+        description = (response.choices[0].message.content or "").strip().strip('"').strip("'")
 
         return jsonify({
             "description": description
