@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/axios'
 import { useTheme } from '../design/Themecontext'
@@ -111,17 +111,39 @@ export default function Recommendations() {
   const [error, setError] = useState(null)
   const [saved, setSaved] = useState(new Set())
 
+  // ── Fetch-once guard — prevents duplicate API calls on re-renders ──
+  const hasFetched = useRef(false)
+
   useEffect(() => {
+    if (hasFetched.current) return   // ← already fetched this mount, bail out
+    hasFetched.current = true
+
+    // ── Check sessionStorage cache first ──
+    const cacheKey = `recs_${user.id}`
+    try {
+      const cached = sessionStorage.getItem(cacheKey)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        setRecs(parsed)
+        setLoading(false)
+        return   // ← use cache, skip API call entirely
+      }
+    } catch (_) { /* ignore parse errors */ }
+
+    // ── No cache — call the API ──
     setLoading(true)
     setError(null)
     api.get(`/api/recommendations/${user.id}`)
       .then(r => {
-        // ── THE FIX ──────────────────────────────────────────────────────────
-        // Backend returns { recommendations: { destinations:[…], places:[…], budget_tips:[…] } }
-        // We unwrap the inner object so the UI gets destinations/places/budget_tips directly.
         const data = r.data?.recommendations ?? r.data
         const hasData = data && (data.destinations?.length || data.places?.length || data.budget_tips?.length)
-        setRecs(hasData ? data : null)
+        const result = hasData ? data : null
+        setRecs(result)
+
+        // ── Save to sessionStorage so revisits skip Groq ──
+        if (result) {
+          try { sessionStorage.setItem(cacheKey, JSON.stringify(result)) } catch (_) { /* storage full, ignore */ }
+        }
       })
       .catch(err => {
         console.error('Recommendations fetch failed:', err)
@@ -159,7 +181,7 @@ export default function Recommendations() {
       <div style={{ textAlign: 'center', padding: 40 }}>
         <p style={{ fontSize: 48, marginBottom: 14 }}>⚠️</p>
         <p style={{ fontSize: 16, fontWeight: 700, color: themes[isDark ? 'dark' : 'light'].textPrimary, margin: '0 0 8px' }}>{error}</p>
-        <button onClick={() => window.location.reload()} style={{ marginTop: 16, padding: '10px 24px', borderRadius: 10, border: 'none', background: themes[isDark ? 'dark' : 'light'].primary, color: '#fff', fontWeight: 700, cursor: 'pointer', fontFamily: 'Manrope, sans-serif' }}>
+        <button onClick={() => { hasFetched.current = false; window.location.reload() }} style={{ marginTop: 16, padding: '10px 24px', borderRadius: 10, border: 'none', background: themes[isDark ? 'dark' : 'light'].primary, color: '#fff', fontWeight: 700, cursor: 'pointer', fontFamily: 'Manrope, sans-serif' }}>
           Retry
         </button>
       </div>

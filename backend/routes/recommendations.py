@@ -13,7 +13,7 @@ recommendations_bp = Blueprint('recommendations', __name__)
 
 # ─── Groq config ──────────────────────────────────────────────────────────────
 GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama3-70b-8192"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # ─── Status ───────────────────────────────────────────────────────────────────
 @recommendations_bp.route('/recommendations/status', methods=['GET'])
