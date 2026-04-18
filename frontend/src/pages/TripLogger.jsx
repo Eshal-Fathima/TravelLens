@@ -524,8 +524,8 @@ export default function TripLogger() {
                   </div>
 
                   {/* Trip rows */}
-                  {monthTrips.map((trip) => {
-                    const goLeft = trip._globalIdx % 2 === 0
+                  {monthTrips.map((trip, index) => {
+                    const goLeft = index % 2 === 0
 
                     return (
                       <div
