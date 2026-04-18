@@ -13,6 +13,11 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # New profile fields
+    phone = db.Column(db.String(20), nullable=True)
+    travel_type = db.Column(db.String(20), nullable=True, default='Solo')
+    budget = db.Column(db.Integer, nullable=True, default=0)
+    
     # Relationships
     trips = db.relationship('Trip', backref='user', lazy=True, cascade='all, delete-orphan')
     
@@ -30,5 +35,8 @@ class User(db.Model):
             'id': self.id,
             'name': self.name,
             'email': self.email,
+            'phone': self.phone,
+            'travel_type': self.travel_type,
+            'budget': self.budget,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

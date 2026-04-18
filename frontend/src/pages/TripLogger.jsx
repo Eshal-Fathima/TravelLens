@@ -392,6 +392,7 @@ export default function TripLogger() {
   const nodeDotActive = isDark ? t.accent : t.primary
   const nodeFg = isDark ? '#002204' : '#ffffff'
   const pathColor = isDark ? '#a3c9ff' : '#003461'
+  let counter = 0
 
   return (
     <>
@@ -524,8 +525,9 @@ export default function TripLogger() {
                   </div>
 
                   {/* Trip rows */}
-                  {monthTrips.map((trip, index) => {
-                    const goLeft = index % 2 === 0
+                  {monthTrips.map((trip) => {
+                    const goLeft = counter % 2 === 0
+                    counter++
 
                     return (
                       <div

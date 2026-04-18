@@ -14,6 +14,7 @@ import ExpenseTracker from './pages/ExpenseTracker'
 import Insights from './pages/Insights'
 import Recommendations from './pages/Recommendations'
 import Analytics from './pages/analytics'
+import Settings from './pages/Settings'
 
 function AppContent() {
   const { user, logout } = useAuth()
@@ -33,6 +34,7 @@ function AppContent() {
       <Route path="/insights" element={user ? <Layout user={user} onLogout={logout}><Insights /></Layout> : <Navigate to="/login" />} />
       <Route path="/recommendations" element={user ? <Layout user={user} onLogout={logout}><Recommendations /></Layout> : <Navigate to="/login" />} />
       <Route path="/analytics" element={user ? <Layout user={user} onLogout={logout}><Analytics /></Layout> : <Navigate to="/login" />} />
+      <Route path="/settings" element={user ? <Layout user={user} onLogout={logout}><Settings /></Layout> : <Navigate to="/login" />} />
 
       <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} />} />
     </Routes>
