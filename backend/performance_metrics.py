@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore")
 # ─────────────────────────────────────────────
 # DB CONNECTION
 # ─────────────────────────────────────────────
-DB_URL = "mysql+pymysql://travellens_user:travel123@localhost/travellens"
+DB_URL = "mysql+pymysql://root:HRSD%4019es@localhost/travellens"
 engine = create_engine(DB_URL)
 
 print("=" * 60)
