@@ -1,6 +1,5 @@
 from extensions import db
 import bcrypt
-from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
 class User(db.Model):
@@ -13,7 +12,7 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # New profile fields
+    # Profile fields
     phone = db.Column(db.String(20), nullable=True)
     travel_type = db.Column(db.String(20), nullable=True, default='Solo')
     budget = db.Column(db.Integer, nullable=True, default=0)
@@ -22,15 +21,17 @@ class User(db.Model):
     trips = db.relationship('Trip', backref='user', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
-        """Hash and set password"""
-        self.password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        self.password_hash = bcrypt.hashpw(
+            password.encode('utf-8'), bcrypt.gensalt()
+        ).decode('utf-8')
     
     def check_password(self, password):
-        """Check if provided password matches hash"""
-        return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
+        return bcrypt.checkpw(
+            password.encode('utf-8'),
+            self.password_hash.encode('utf-8')
+        )
     
     def to_dict(self):
-        """Convert user object to dictionary"""
         return {
             'id': self.id,
             'name': self.name,

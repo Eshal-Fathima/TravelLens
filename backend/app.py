@@ -25,7 +25,7 @@ def create_app():
     jwt.init_app(app)
     migrate.init_app(app, db)
 
-    CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
+    CORS(app, supports_credentials=True)  # Allow all origins for development
 
     # ---------------- MODELS ---------------- #
     from models import User, Trip, Place, Hotel, Expense

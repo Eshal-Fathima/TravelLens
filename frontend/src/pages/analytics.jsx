@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../hooks/useAuth'
 import api from '../utils/axios'
 import { useTheme } from '../design/Themecontext'
 import { Spinner, EmptyState } from '../design/UI'
