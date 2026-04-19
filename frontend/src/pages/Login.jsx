@@ -59,16 +59,16 @@ export default function Login() {
     onChange: e => setFormData({ ...formData, [key]: e.target.value }),
   })
 
-  /* ── Light-mode surface tokens pulled from theme; dark uses midnight palette ── */
-  const surface = dark ? '#131313' : t.sidebar
-  const panelBg = dark ? '#1b1b1b' : t.input
-  const inputBg = dark ? '#252525' : t.input
-  const inputBdr = dark ? 'transparent' : t.inputBorder
-  const textPri = dark ? '#e2e2e2' : t.textPrimary
-  const textSec = dark ? 'rgba(226,226,226,0.5)' : t.textSecondary
-  const textMuted = dark ? 'rgba(226,226,226,0.25)' : t.textMuted
-  const divBdr = dark ? 'rgba(255,255,255,0.07)' : t.border
-  const focusClr = dark ? '#00e1ab' : '#3b82f6'
+  /* ── Light-mode surface tokens matched to Signup/Layout theme ── */
+  const surface = dark ? '#131313' : '#fdfae7'
+  const panelBg = dark ? '#1b1b1b' : '#f7f4e1'
+  const inputBg = dark ? '#252525' : '#f7f4e1'
+  const inputBdr = dark ? 'transparent' : 'rgba(66,71,80,0.12)'
+  const textPri = dark ? '#e2e2e2' : '#1c1c11'
+  const textSec = dark ? 'rgba(226,226,226,0.5)' : '#424750'
+  const textMuted = dark ? 'rgba(226,226,226,0.25)' : '#727781'
+  const divBdr = dark ? 'rgba(255,255,255,0.07)' : 'rgba(66,71,80,0.12)'
+  const focusClr = dark ? '#00e1ab' : '#003461'
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'Manrope', sans-serif", background: surface, transition: 'background 0.3s, color 0.3s' }}>
@@ -104,7 +104,7 @@ export default function Login() {
           flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
           padding: 12px; border-radius: 12px;
           border: 1px solid ${divBdr};
-          background: ${dark ? '#1f1f1f' : t.input};
+          background: ${dark ? '#1f1f1f' : panelBg};
           color: ${textSec}; font-size: 13px; font-weight: 600;
           cursor: pointer; transition: border-color 0.2s, background 0.2s;
         }
@@ -216,7 +216,7 @@ export default function Login() {
           className="tl-btn"
           style={{
             position: 'absolute', top: 20, right: 20,
-            background: dark ? 'rgba(255,255,255,0.06)' : '#f1f5f9',
+            background: dark ? 'rgba(255,255,255,0.06)' : '#f7f4e1',
             border: `1px solid ${divBdr}`, borderRadius: 8,
             padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6,
             color: textSec, fontSize: 12, fontFamily: "'Manrope', sans-serif",
@@ -361,7 +361,7 @@ export default function Login() {
           {/* Demo credentials */}
           <div style={{
             marginTop: 24, padding: '14px 16px', borderRadius: 12,
-            background: dark ? 'rgba(0,225,171,0.04)' : '#f8fafc',
+            background: dark ? 'rgba(0,225,171,0.04)' : '#f7f4e1',
             border: `1px solid ${dark ? 'rgba(0,225,171,0.12)' : divBdr}`,
           }}>
             <p style={{
