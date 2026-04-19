@@ -24,12 +24,48 @@ warnings.filterwarnings("ignore")
 # ─────────────────────────────────────────────
 # DB CONNECTION
 # ─────────────────────────────────────────────
-DB_URL = "mysql+pymysql://root:HRSD%4019es@localhost/travellens"
+DB_URL = "mysql+pymysql://travellens_user:travel123@localhost/travellens"
 engine = create_engine(DB_URL)
 
 print("=" * 60)
 print("   TravelLens — Recommendation System Performance Metrics")
 print("=" * 60)
+
+
+# ─────────────────────────────────────────────
+# DESTINATION NORMALIZER
+# Groups similar destination names so the system
+# treats 'Ladakh', 'Leh-Ladakh' as the same place
+# ─────────────────────────────────────────────
+DESTINATION_GROUPS = {
+    "Ladakh":           ["Ladakh", "Leh-Ladakh", "Leh Ladakh", "Leh, Ladakh"],
+    "Manali":           ["Manali", "Himachal Pradesh", "Himachal", "Manali, Himachal Pradesh"],
+    "Andaman":          ["Andaman", "Port Blair, Andaman & Nicobar Islands", "Andaman & Nicobar", "Andaman Islands"],
+    "Goa":              ["Goa"],
+    "Kerala":           ["Kerala", "Alleppey", "Munnar", "Kochi"],
+    "Pondicherry":      ["Pondicherry", "Puducherry"],
+    "Jaipur":           ["Jaipur", "Jaipur, Rajasthan"],
+    "Varanasi":         ["Varanasi", "Varanasi, Uttar Pradesh"],
+    "Coorg":            ["Coorg", "Coorg, Karnataka"],
+    "Rishikesh":        ["Rishikesh", "Rishikesh, Uttarakhand"],
+    "Spiti Valley":     ["Spiti Valley", "Spiti Valley, Himachal Pradesh"],
+    "Mysuru":           ["Mysuru", "Mysuru, Karnataka", "Mysore"],
+    "Kutch":            ["Kutch", "Kutch, Gujarat", "Rann of Kutch"],
+    "Switzerland":      ["Switzerland"],
+    "Tokyo":            ["Tokyo"],
+    "Maldives":         ["Maldives"],
+    "Dubai":            ["Dubai"],
+    "Bali":             ["Bali"],
+}
+
+# Build reverse lookup: raw name → normalized name
+_reverse_map = {}
+for normalized, variants in DESTINATION_GROUPS.items():
+    for v in variants:
+        _reverse_map[v.strip().lower()] = normalized
+
+def normalize_destination(dest):
+    return _reverse_map.get(str(dest).strip().lower(), str(dest).strip())
 
 
 def load_data():
@@ -61,6 +97,7 @@ def build_interaction_matrix(trips, places):
     """
     merged = trips[["id", "user_id", "destination"]].copy()
     merged.columns = ["trip_id", "user_id", "destination"]
+    merged["destination"] = merged["destination"].apply(normalize_destination)
 
     # Count visits per user per destination
     interactions = merged.groupby(["user_id", "destination"]).size().reset_index(name="visits")
