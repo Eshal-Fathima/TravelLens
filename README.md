@@ -26,6 +26,7 @@ Built collaboratively: the **frontend, UI/UX, ML analytics engine, Groq AI integ
 ---
 
 ## What It Does
+<div align="center">
 
 <div align="center">
 
@@ -39,6 +40,7 @@ Built collaboratively: the **frontend, UI/UX, ML analytics engine, Groq AI integ
 | **Spotify Wrapped-style Insights** | Annual travel summary with stats and highlights |
 | **AI Recommendations** | Groq-powered destination and activity suggestions |
 | **Budget Optimization** | ML-driven tips based on your spending patterns |
+</div>
 
 </div>
 ---
