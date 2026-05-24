@@ -27,6 +27,8 @@ Built collaboratively: the **frontend, UI/UX, ML analytics engine, Groq AI integ
 
 ## What It Does
 
+<div align="center">
+
 | Feature | Description |
 |---------|-------------|
 | **Trip Logger** | Create, edit, and delete trips with dates, destinations, and notes |
@@ -38,6 +40,7 @@ Built collaboratively: the **frontend, UI/UX, ML analytics engine, Groq AI integ
 | **AI Recommendations** | Groq-powered destination and activity suggestions |
 | **Budget Optimization** | ML-driven tips based on your spending patterns |
 
+</div>
 ---
 
 ## My Contributions
@@ -70,6 +73,8 @@ Implemented the machine learning layer in Python using scikit-learn:
 
 ## Tech Stack
 
+<div align="center">
+  
 ### Frontend
 | Tool | Purpose |
 |------|---------|
@@ -102,6 +107,8 @@ Implemented the machine learning layer in Python using scikit-learn:
 | **MySQL** | Relational database for all user data |
 | **GeoDB Cities API** | Real-time destination metadata |
 | **OpenTripMap API** | Attraction and place information |
+
+</div>
 
 ---
 
