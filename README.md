@@ -11,7 +11,7 @@
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-F7931E?style=flat-square&logo=scikit-learn&logoColor=white)](https://scikit-learn.org)
 [![MySQL](https://img.shields.io/badge/MySQL-Database-4479A1?style=flat-square&logo=mysql&logoColor=white)](https://mysql.com)
 
-*Full-stack · AI-integrated · ML-powered · Built in a 2-person team*
+*Full-stack · AI-integrated · ML-powered *
 
 </div>
 
@@ -28,6 +28,8 @@ Built collaboratively: the **frontend, UI/UX, ML analytics engine, Groq AI integ
 ## What It Does
 <div align="center">
 
+<div align="center">
+
 | Feature | Description |
 |---------|-------------|
 | **Trip Logger** | Create, edit, and delete trips with dates, destinations, and notes |
@@ -40,11 +42,12 @@ Built collaboratively: the **frontend, UI/UX, ML analytics engine, Groq AI integ
 | **Budget Optimization** | ML-driven tips based on your spending patterns |
 </div>
 
+</div>
 ---
 
 ## My Contributions
 
-This was a 2-person project. Here's a breakdown of what I owned end-to-end:
+Here's a breakdown of what I owned end-to-end:
 
 ### Frontend Architecture & UI/UX
 Built the entire React 18 frontend from scratch using Vite, Tailwind CSS, and React Router. Designed and implemented all 7 core pages — Dashboard, Trip Logger, Places Logger, Hotel Logger, Expense Tracker, Insights, and Recommendations — with a consistent design system, responsive layout, smooth animations, and micro-interactions throughout.
@@ -72,6 +75,8 @@ Implemented the machine learning layer in Python using scikit-learn:
 
 ## Tech Stack
 
+<div align="center">
+  
 ### Frontend
 | Tool | Purpose |
 |------|---------|
@@ -104,6 +109,8 @@ Implemented the machine learning layer in Python using scikit-learn:
 | **MySQL** | Relational database for all user data |
 | **GeoDB Cities API** | Real-time destination metadata |
 | **OpenTripMap API** | Attraction and place information |
+
+</div>
 
 ---
 
